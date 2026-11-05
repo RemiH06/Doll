@@ -2,7 +2,8 @@ from pathlib import Path
 
 from doll import grep
 from doll.corpus import Corpus
-from doll.evaluar import evaluar
+from doll.evaluar import evaluar, evaluar_generacion
+from doll.preguntar import Cita, Respuesta
 
 NOTAS = Corpus("t", Path(__file__).parent / "boveda").notas()
 ESCAPES = "recursos/oficios/Escapes.md"
@@ -33,3 +34,19 @@ def test_cruzada_exige_todas_las_notas():
     r = evaluar(preguntas, motor)
     assert r.por_tipo == {"directa": (1, 1), "cruzada": (0, 1)}
     assert r.fallos == ["b"] and r.recall == 0.5
+
+
+def respuesta(*rutas):
+    return Respuesta(texto="ok", citas=[Cita("x", r, 1, 1, False) for r in rutas])
+
+
+def test_generacion_exige_citar_todas_las_notas(tmp_path):
+    preguntas = [
+        {"id": "a", "tipo": "cruzada", "pregunta": "dos", "notas": ["x.md", "y.md"]},
+        {"id": "b", "tipo": "cruzada", "pregunta": "una", "notas": ["x.md", "y.md"]},
+        {"id": "c", "tipo": "no_respondible", "pregunta": "nada"},
+    ]
+    salidas = {"dos": respuesta("x.md", "y.md"), "una": respuesta("x.md"), "nada": Respuesta(no_encontrado=True)}
+    g = evaluar_generacion(preguntas, salidas.__getitem__, tmp_path / "s.jsonl")
+    assert (g.todas_las_notas, g.alguna_nota, g.respondibles) == (1, 2, 2)
+    assert g.no_encontrado == 1 and g.fallos == ["b"]

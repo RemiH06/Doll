@@ -1,4 +1,6 @@
 ---
+tipo: proyecto
+dominio: [náutica]
 tags: [proyecto, calibración]
 estado: activo
 ---

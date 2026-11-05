@@ -40,7 +40,7 @@ wheels = [
 [[package]]
 name = "bakers"
 version = "0.1.0"
-source = { git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers#a9479afb6cc5d0b189abc5cd8bc7bdc7e5458935" }
+source = { git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers#38228cbaacf80b3b2884e5005718ee56da6c6a53" }
 dependencies = [
     { name = "httpx" },
     { name = "mcp" },
@@ -216,6 +216,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "bakers" },
+    { name = "doll-parser" },
 ]
 
 [package.dev-dependencies]
@@ -224,10 +225,18 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "bakers", git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers" }]
+requires-dist = [
+    { name = "bakers", git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers" },
+    { name = "doll-parser", directory = "parser" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.2.0" }]
+
+[[package]]
+name = "doll-parser"
+version = "0.2.0"
+source = { directory = "parser" }
 
 [[package]]
 name = "h11"

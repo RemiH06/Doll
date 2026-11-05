@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bakers",
+    "doll-parser",
 ]
 
 [project.scripts]
@@ -27,3 +28,4 @@ dev = [
 
 [tool.uv.sources]
 bakers = { git = "https://github.com/RemiH06/Bakery.git", subdirectory = "bakers" }
+doll-parser = { path = "parser" }

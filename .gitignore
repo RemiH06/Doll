@@ -15,3 +15,6 @@ __pycache__/
 corpus.toml
 eval/
 .env
+
+# Rust
+parser/target/

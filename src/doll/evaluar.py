@@ -51,7 +51,8 @@ def evaluar(preguntas: list[dict], motor: Motor, k: int = 5) -> Reporte:
 @dataclass
 class ReporteGeneracion:
     con_citas: int
-    nota_correcta: int
+    todas_las_notas: int  # el acierto: una cruzada que cita solo una de sus notas no contestó
+    alguna_nota: int  # la métrica de la iteración 1, para comparar
     respondibles: int
     no_encontrado: int
     no_respondibles: int
@@ -61,7 +62,7 @@ class ReporteGeneracion:
 
 def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path) -> ReporteGeneracion:
     """Corre `responder(pregunta)` y guarda cada respuesta completa para leerla: acertar no prueba no inventar."""
-    con_citas = nota_correcta = no_encontrado = respondibles = no_respondibles = 0
+    con_citas = todas_las_notas = alguna_nota = no_encontrado = respondibles = no_respondibles = 0
     fallos, tiempos = [], []
     with salida.open("w", encoding="utf-8") as f:
         for p in preguntas:
@@ -73,8 +74,9 @@ def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path)
             if esperadas:
                 respondibles += 1
                 con_citas += bool(r.citas)
-                acierto = bool(citadas & esperadas)
-                nota_correcta += acierto
+                acierto = esperadas <= citadas
+                todas_las_notas += acierto
+                alguna_nota += bool(citadas & esperadas)
             else:
                 no_respondibles += 1
                 acierto = r.no_encontrado
@@ -85,5 +87,5 @@ def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path)
                                 "descartadas": r.citas_descartadas, "intentos": r.intentos,
                                 "citas": [(c.ruta, c.texto) for c in r.citas]}, ensure_ascii=False) + "\n")
             f.flush()
-    return ReporteGeneracion(con_citas, nota_correcta, respondibles, no_encontrado, no_respondibles,
+    return ReporteGeneracion(con_citas, todas_las_notas, alguna_nota, respondibles, no_encontrado, no_respondibles,
                              sum(tiempos) / max(len(tiempos), 1), fallos)

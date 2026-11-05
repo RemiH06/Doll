@@ -1,0 +1,18 @@
+# Paquete aparte: maturin no acepta `project.scripts` junto a `bindings = "bin"`.
+[project]
+name = "doll-parser"
+version = "0.2.0"
+description = "Filtro de Doll: notas por stdin, fragmentos, enlaces y frontmatter por stdout"
+license = "AGPL-3.0-only"
+requires-python = ">=3.13"
+
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "bin"
+
+[tool.uv]
+# uv no sabe de Rust: sin esto, editar el parser no recompila en `uv sync`.
+cache-keys = [{ file = "pyproject.toml" }, { file = "Cargo.toml" }, { file = "Cargo.lock" }, { file = "src/**/*.rs" }]

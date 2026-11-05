@@ -11,7 +11,7 @@ from pathlib import Path
 
 from doll import indice
 from doll.corpus import Corpus, home
-from doll.indice import Resultado
+from doll.indice import Filtro, Resultado
 
 INTENTOS = 2
 MIN_CITA = 4  # una cita de dos letras aparece en cualquier fragmento y no prueba nada
@@ -74,6 +74,29 @@ def verificar(citas: list[str], fragmentos: list[Resultado], corpus: Corpus) -> 
     return buenas, malas
 
 
+def texto_fragmentos(fragmentos: list[Resultado], corpus: Corpus) -> str:
+    """Lo que ve quien busca, por CLI o MCP: la marca de terceros sale siempre."""
+    partes = []
+    for f in fragmentos:
+        aviso = f" [{AVISO_TERCEROS}]" if corpus.es_terceros(f.ruta) else ""
+        partes.append(f"{f.ruta}:{f.linea_ini}-{f.linea_fin} [{f.encabezado}]{aviso}\n{f.texto}\n")
+    return "\n".join(partes)
+
+
+def texto_respuesta(r: Respuesta, corpus: Corpus) -> str:
+    if r.fallo:
+        return f"Sin respuesta generada: {r.fallo}\nFragmentos recuperados:\n\n{texto_fragmentos(r.fragmentos, corpus)}"
+    if r.no_encontrado:
+        return "No encontrado."
+    lineas = [f"{r.texto}\n"]
+    for c in r.citas:
+        aviso = f" [{AVISO_TERCEROS}]" if c.terceros else ""
+        lineas.append(f"- {c.ruta}:{c.linea_ini}-{c.linea_fin}{aviso}\n  {c.texto}")
+    if r.citas_descartadas:
+        lineas.append(f"({r.citas_descartadas} citas descartadas: no aparecen en las notas)")
+    return "\n".join(lineas)
+
+
 def contexto(fragmentos: list[Resultado], corpus: Corpus) -> str:
     partes = []
     for i, f in enumerate(fragmentos, 1):
@@ -117,9 +140,10 @@ def _generar(fragmentos: list[Resultado], corpus: Corpus, consulta: str, baker: 
     return r
 
 
-def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5, baker: Baker = _bake) -> Respuesta:
+def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5, baker: Baker = _bake,
+              filtro: Filtro = Filtro()) -> Respuesta:
     inicio = time.perf_counter()
-    fragmentos = indice.buscar(con, consulta, k)
+    fragmentos = indice.buscar(con, consulta, k, filtro)
     if not fragmentos:
         r = Respuesta(no_encontrado=True)
     else:

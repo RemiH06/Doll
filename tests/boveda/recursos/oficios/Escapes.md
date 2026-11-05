@@ -1,4 +1,6 @@
 ---
+tipo: referencia
+dominio: [relojería]
 tags: [relojería, mecanismo]
 ---
 

@@ -1,4 +1,6 @@
 ---
+tipo: proyecto
+dominio: [relojería, restauración]
 tags: [proyecto, restauración]
 estado: activo
 ---
@@ -9,7 +11,7 @@ Restauración del reloj de la plaza de Valdeluna, construido en 1874 por la casa
 
 ## Diagnóstico
 
-El escape de áncora está gastado y atrasa cuatro minutos por semana. Ver [[Escapes]].
+El escape de áncora está gastado y atrasa cuatro minutos por semana. Ver [[Escapes]]. Encargo de [[Doña Pruebas|la señora del encargo]], con dudas en [[life/Sin nota]].
 
 ## Presupuesto
 

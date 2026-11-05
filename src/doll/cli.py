@@ -4,7 +4,8 @@ import sys
 from doll import corpus as corpus_mod
 from doll import evaluar as evaluar_mod
 from doll import grep, indice
-from doll.preguntar import AVISO_TERCEROS, preguntar
+from doll.indice import Filtro
+from doll.preguntar import preguntar, texto_fragmentos, texto_respuesta
 
 
 def _indice(nombre: str):
@@ -13,34 +14,25 @@ def _indice(nombre: str):
     return con, indice.indexar(con, corpus)
 
 
+def _filtro(args) -> Filtro:
+    return Filtro(args.tipo, args.dominio)
+
+
 def _indexar(args) -> None:
     _, (cambiadas, quitadas) = _indice(args.corpus)
     print(f"{cambiadas} notas reindexadas, {quitadas} quitadas")
 
 
 def _buscar(args) -> None:
+    corpus = corpus_mod.cargar(args.corpus)
     con, _ = _indice(args.corpus)
-    for r in indice.buscar(con, args.consulta, args.k):
-        print(f"{r.ruta}:{r.linea_ini}-{r.linea_fin} [{r.encabezado}]\n{r.texto}\n")
+    print(texto_fragmentos(indice.buscar(con, args.consulta, args.k, _filtro(args)), corpus))
 
 
 def _preguntar(args) -> None:
     corpus = corpus_mod.cargar(args.corpus)
     con, _ = _indice(args.corpus)
-    r = preguntar(con, corpus, args.consulta, args.k)
-    if r.fallo:
-        print(f"Sin respuesta generada: {r.fallo}\nFragmentos recuperados:\n")
-        for f in r.fragmentos:
-            print(f"{f.ruta}:{f.linea_ini}-{f.linea_fin} [{f.encabezado}]\n{f.texto}\n")
-    elif r.no_encontrado:
-        print("No encontrado.")
-    else:
-        print(f"{r.texto}\n")
-        for c in r.citas:
-            aviso = f" [{AVISO_TERCEROS}]" if c.terceros else ""
-            print(f"- {c.ruta}:{c.linea_ini}-{c.linea_fin}{aviso}\n  {c.texto}")
-        if r.citas_descartadas:
-            print(f"({r.citas_descartadas} citas descartadas: no aparecen en las notas)")
+    print(texto_respuesta(preguntar(con, corpus, args.consulta, args.k, filtro=_filtro(args)), corpus))
 
 
 def _generacion(args) -> None:
@@ -53,10 +45,17 @@ def _generacion(args) -> None:
         eval_dir / "ultima.jsonl",
     )
     print(f"con citas reales: {g.con_citas}/{g.respondibles}")
-    print(f"citan una nota esperada: {g.nota_correcta}/{g.respondibles}")
+    print(f"citan todas sus notas: {g.todas_las_notas}/{g.respondibles}")
+    print(f"citan alguna nota esperada: {g.alguna_nota}/{g.respondibles}")
     print(f"no respondibles detectadas: {g.no_encontrado}/{g.no_respondibles}")
     print(f"segundos promedio: {g.segundos_promedio:.1f}")
     print(f"fallos: {' '.join(g.fallos) or 'ninguno'}")
+
+
+def _mcp(args) -> None:
+    from doll.mcp_server import crear  # import aquí: la CLI no carga el paquete mcp
+
+    crear(args.corpus).run()
 
 
 def _evaluar(args) -> None:
@@ -93,11 +92,15 @@ def main() -> None:
     bu = subs.add_parser("buscar", help="fragmentos con ruta y líneas")
     bu.add_argument("consulta")
     bu.add_argument("-k", type=int, default=5)
+    bu.add_argument("--tipo", help="solo notas con este tipo")
+    bu.add_argument("--dominio", help="solo notas con este dominio")
     bu.set_defaults(func=_buscar)
 
     pr = subs.add_parser("preguntar", help="respuesta del Baker doll con citas verificadas")
     pr.add_argument("consulta")
     pr.add_argument("-k", type=int, default=5)
+    pr.add_argument("--tipo", help="solo notas con este tipo")
+    pr.add_argument("--dominio", help="solo notas con este dominio")
     pr.set_defaults(func=_preguntar)
 
     ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/preguntas.toml")
@@ -105,6 +108,9 @@ def main() -> None:
     ev.add_argument("--generacion", action="store_true", help="mide respuestas y citas con el Baker")
     ev.add_argument("-k", type=int, default=5)
     ev.set_defaults(func=_evaluar)
+
+    mc = subs.add_parser("mcp", help="servidor MCP por stdio")
+    mc.set_defaults(func=_mcp)
 
     args = parser.parse_args()
     args.func(args)
