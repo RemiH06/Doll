@@ -1,0 +1,17 @@
+# Contexto local
+CLAUDE.md
+steps.md
+plan.md
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Datos: viven en ~/.doll/, esto es una red por si algo cae aquí
+*.db
+*.db-wal
+*.db-shm
+corpus.toml
+eval/
+.env
