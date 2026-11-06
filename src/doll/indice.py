@@ -67,6 +67,13 @@ class Filtro:
     tipo: str | None = None
     dominio: str | None = None
     ocultar: tuple[str, ...] = ()  # patrones de ruta, para lo que no debe salir por el MCP
+    solo: tuple[str, ...] = ()  # patrones de ruta; vacío: todas
+
+    def admite(self, ruta: str) -> bool:
+        camino = PurePosixPath(ruta)
+        if any(camino.full_match(p) for p in self.ocultar):
+            return False
+        return not self.solo or any(camino.full_match(p) for p in self.solo)
 
 
 def abrir(archivo: Path) -> sqlite3.Connection:
@@ -187,7 +194,7 @@ def _vecinas(con: sqlite3.Connection, rutas: Collection[str]) -> set[str]:
 
 
 def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filtro()) -> list[Resultado]:
-    """Hasta k fragmentos, con tope por nota, más un fragmento de hasta VECINAS notas enlazadas."""
+    """Hasta k fragmentos, con tope por nota, más un fragmento de hasta VECINAS notas enlazadas a la mejor."""
     # Entre comillas, cada término es texto: la consulta no puede inyectar sintaxis FTS5.
     expresion = " OR ".join(f'"{t}"' for t in terminos(consulta))
     if not expresion:
@@ -204,8 +211,7 @@ def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filt
         valores,
     )
     # Sin LIMIT: el orden de bm25 decide tanto el tope como qué fragmento de cada vecina entra.
-    candidatos = [r for r in map(Resultado._make, filas)
-                  if not any(PurePosixPath(r.ruta).full_match(p) for p in filtro.ocultar)]
+    candidatos = [r for r in map(Resultado._make, filas) if filtro.admite(r.ruta)]
     elegidos: list[Resultado] = []
     por_nota: Counter[str] = Counter()
     resto = []
@@ -217,7 +223,8 @@ def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filt
             resto.append(r)
     if not elegidos:
         return []
-    vecinas = _vecinas(con, list(por_nota))
+    # Solo de la mejor: con notas índice de por medio, las de todas son decenas y bm25 elige entre ajenas.
+    vecinas = _vecinas(con, [elegidos[0].ruta]) - por_nota.keys()
     for r in resto:
         if r.ruta in vecinas and len(elegidos) < k + VECINAS:
             elegidos.append(r)

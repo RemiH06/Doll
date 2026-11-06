@@ -106,7 +106,7 @@ def main() -> None:
 
     ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/<set>.toml")
     ev.add_argument("--motor", default="fts", choices=["grep", "fts"])
-    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion"])
+    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs"])
     ev.add_argument("--generacion", action="store_true", help="mide respuestas y citas con el Baker")
     ev.add_argument("-k", type=int, default=5)
     ev.set_defaults(func=_evaluar)

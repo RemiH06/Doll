@@ -36,6 +36,13 @@ def test_cruzada_exige_todas_las_notas():
     assert r.fallos == ["b"] and r.recall == 0.5
 
 
+def test_notas_equivalentes_cuentan_con_una():
+    preguntas = [{"id": "a", "tipo": "directa", "pregunta": "escape áncora", "notas": [["no/existe.md", ESCAPES]]},
+                 {"id": "b", "tipo": "cruzada", "pregunta": "escape áncora", "notas": [["no/existe.md"], ESCAPES]}]
+    r = evaluar(preguntas, motor)
+    assert r.por_tipo == {"directa": (1, 1), "cruzada": (0, 1)} and r.fallos == ["b"]
+
+
 def respuesta(*rutas):
     return Respuesta(texto="ok", citas=[Cita("x", r, 1, 1, False) for r in rutas])
 
@@ -50,6 +57,14 @@ def test_generacion_exige_citar_todas_las_notas(tmp_path):
     g = evaluar_generacion(preguntas, salidas.__getitem__, tmp_path / "s.jsonl")
     assert (g.todas_las_notas, g.alguna_nota, g.respondibles) == (1, 2, 2)
     assert g.no_encontrado == 1 and g.fallos == ["b"]
+
+
+def test_generacion_acepta_notas_equivalentes(tmp_path):
+    preguntas = [{"id": "a", "tipo": "cruzada", "pregunta": "dos", "notas": [["x.md", "z.md"], "y.md"]},
+                 {"id": "b", "tipo": "cruzada", "pregunta": "una", "notas": [["x.md", "z.md"], "y.md"]}]
+    salidas = {"dos": respuesta("z.md", "y.md"), "una": respuesta("y.md")}
+    g = evaluar_generacion(preguntas, salidas.__getitem__, tmp_path / "s.jsonl")
+    assert (g.todas_las_notas, g.alguna_nota) == (1, 2) and g.fallos == ["b"]
 
 
 def test_citar_la_nota_sin_el_dato_no_trae_evidencia(tmp_path):

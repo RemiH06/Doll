@@ -18,6 +18,11 @@ def cargar_preguntas(archivo: Path) -> list[dict]:
     return tomllib.loads(archivo.read_text(encoding="utf-8"))["p"]
 
 
+def _cumple(esperada: str | list[str], rutas: set[str]) -> bool:
+    """Una lista son notas equivalentes: el mismo dato vive en más de una, y basta con una."""
+    return esperada in rutas if isinstance(esperada, str) else bool(rutas.intersection(esperada))
+
+
 @dataclass
 class Reporte:
     por_tipo: dict[str, tuple[int, int]]
@@ -37,14 +42,15 @@ def evaluar(preguntas: list[dict], motor: Motor, k: int = 5) -> Reporte:
     por_tipo: dict[str, tuple[int, int]] = {}
     fallos, chars, tiempos = [], [], []
     for p in preguntas:
-        esperadas = set(p.get("notas", ()))
+        esperadas = p.get("notas", ())
         inicio = time.perf_counter()
         resultado = motor(p["pregunta"], k)
         tiempos.append(time.perf_counter() - inicio)
         if not esperadas:  # no_respondible: mide generación, no recuperación
             continue
         chars.append(sum(c for _, c in resultado))
-        acierto = esperadas <= {ruta for ruta, _ in resultado}
+        rutas = {ruta for ruta, _ in resultado}
+        acierto = all(_cumple(e, rutas) for e in esperadas)
         a, t = por_tipo.get(p["tipo"], (0, 0))
         por_tipo[p["tipo"]] = (a + acierto, t + 1)
         if not acierto:
@@ -83,13 +89,13 @@ def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path)
             r = responder(p["pregunta"])
             tiempos.append(time.perf_counter() - inicio)
             citadas = {c.ruta for c in r.citas}
-            esperadas = set(p.get("notas", ()))
+            esperadas = p.get("notas", ())
             if esperadas:
                 respondibles += 1
                 con_citas += bool(r.citas)
-                acierto = esperadas <= citadas
+                acierto = all(_cumple(e, citadas) for e in esperadas)
                 todas_las_notas += acierto
-                alguna_nota += bool(citadas & esperadas)
+                alguna_nota += any(_cumple(e, citadas) for e in esperadas)
             else:
                 no_respondibles += 1
                 acierto = r.no_encontrado

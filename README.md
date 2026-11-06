@@ -45,9 +45,12 @@ ruta = "/ruta/a/tus/notas"
 excluir = ["privado/**"]
 terceros = ["recortes/**"]
 mcp_excluir = ["borradores/**"]
+
+[boveda.alcances]
+'notas? de recortes' = "recortes/**"
 ```
 
-`gente/**` y `life/**` quedan fuera siempre. `mcp_excluir` deja notas fuera del MCP, pero no de la CLI; el servidor no arranca sin esa clave (`[]` si no quieres ocultar nada). `preguntar` usa el paquete [`bakers`](https://github.com/RemiH06/Bakery) y necesita `BAKERS_URL` y `BAKERS_API_KEY`; `buscar` funciona sin ellas.
+`gente/**` y `life/**` quedan fuera siempre. `mcp_excluir` deja notas fuera del MCP, pero no de la CLI; el servidor no arranca sin esa clave (`[]` si no quieres ocultar nada). `alcances` es opcional: si la pregunta coincide con una regex, `preguntar` busca solo en esa carpeta y la frase no cuenta como tema. `preguntar` usa el paquete [`bakers`](https://github.com/RemiH06/Bakery) y necesita `BAKERS_URL` y `BAKERS_API_KEY`; `buscar` funciona sin ellas.
 
 ## Launch arguments
 
@@ -55,7 +58,7 @@ mcp_excluir = ["borradores/**"]
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D]`: fragmentos con ruta y líneas.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll mcp`: servidor MCP por stdio, con las herramientas `buscar` y `preguntar_notas`.
-- `doll evaluar [--motor fts|grep] [--generacion] [--set preguntas|control|nuevas|confirmacion] [-k N]`: mide contra `~/.doll/eval/<set>.toml`.
+- `doll evaluar [--motor fts|grep] [--generacion] [--set preguntas|control|nuevas|confirmacion|docs] [-k N]`: mide contra `~/.doll/eval/<set>.toml`.
 - `--corpus NOMBRE`, antes del comando: elige el corpus; por defecto, `boveda`.
 
 ```bash
@@ -66,8 +69,9 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 
 - Fragmentos por encabezado, con ruta, líneas y hash por nota, partidos por `doll-parser`, un filtro en Rust.
 - Búsqueda FTS5 que ignora acentos, sin servicios externos.
-- Tope de fragmentos por nota y expansión a notas enlazadas con `[[wikilinks]]`.
+- Tope de fragmentos por nota y expansión a las notas enlazadas con `[[wikilinks]]` desde la mejor.
 - Filtro por `tipo` y `dominio` del frontmatter.
+- Si la pregunta pide una carpeta, `preguntar` solo busca ahí; las frases que lo activan se configuran.
 - Un enlace a una nota excluida se tapa en el índice: no queda ni su nombre.
 - Servidor MCP para consultar las notas desde Claude Code.
 - `preguntar` le da al modelo el resto de la mejor nota; `buscar` entrega solo lo que coincide.
@@ -76,6 +80,19 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 - Texto de terceros marcado como no confiable en el prompt y en la salida.
 - `buscar` sigue funcionando sin modelo, y `preguntar` lo dice y entrega los fragmentos.
 - Log local con tiempos y conteos, sin preguntas ni fragmentos.
+
+## Limitaciones
+
+Medido con un modelo local contra preguntas privadas sobre un corpus real.
+
+- Sobre 337 notas, en un set nuevo: citó todas sus notas en 17 de 20 preguntas con respuesta, y el dato exacto salió en 15 de 20. Citar la nota no prueba contestar. En los sets de ajuste baja a cerca del 75 %.
+- Rechazó 11 de 13 preguntas sin respuesta. Si el tema aparece en las notas, puede contestar algo cercano con citas reales: una cita verificada prueba que el texto existe, no que responda la pregunta.
+- A veces dice "no encontrado" aunque el dato esté en lo recuperado.
+- La búsqueda es por palabras: si la pregunta usa otro vocabulario que la nota, puede no encontrarla.
+- El alcance solo actúa con las frases configuradas y por carpeta: "qué dice X sobre Y" puede contestar con otra nota.
+- El chequeo de nombres solo reconoce palabras con mayúscula, y basta con que el nombre salga en cualquier fragmento recuperado.
+- Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
+- Las preguntas de recuperación y de generación se ajustaron sobre el mismo set, y ningún set es del todo ciego.
 
 ## Future Features
 

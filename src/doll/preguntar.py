@@ -7,7 +7,7 @@ import tempfile
 import time
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -159,8 +159,10 @@ def _generar(fragmentos: list[Resultado], corpus: Corpus, consulta: str, baker: 
 def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5, baker: Baker = _bake,
               filtro: Filtro = Filtro()) -> Respuesta:
     inicio = time.perf_counter()
-    # Solo aquí: `buscar` entrega lo mínimo a quien paga cada carácter de contexto.
-    fragmentos = indice.ampliar(con, indice.buscar(con, consulta, k, filtro))
+    # En código: Bonsai ignora el alcance si se le pide en el prompt.
+    tema, solo = corpus.alcance(consulta)
+    # `ampliar` solo aquí: `buscar` entrega lo mínimo a quien paga cada carácter de contexto.
+    fragmentos = indice.ampliar(con, indice.buscar(con, tema, k, replace(filtro, solo=solo)))
     if not fragmentos or nombres_faltantes(consulta, fragmentos):
         r = Respuesta(no_encontrado=True)
     else:

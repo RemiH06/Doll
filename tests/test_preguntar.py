@@ -157,3 +157,24 @@ def test_nombres_faltantes_ignora_inicio_de_frase_y_acentos():
     fragmento = indice.Resultado("a/Nota.md", "N", 1, 2, "Tobías y Rueda están aquí")
     assert nombres_faltantes("Qué es Tobías? Por qué en Rueda?", [fragmento]) == set()
     assert nombres_faltantes("Habla de TOBIAS y de Zacarías", [fragmento]) == {"Zacarías"}
+
+
+def test_alcance_limita_lo_que_ve_el_modelo(con):
+    corpus = Corpus("t", BOVEDA, terceros=("recursos/reels/**",), alcances=((r"reel de oficio", "recursos/reels/**"),))
+    vistos = []
+
+    def baker(tarea, archivo):
+        vistos.append(Path(archivo).read_text(encoding="utf-8"))
+        return {"respuesta": "", "citas": [], "no_encontrado": True}
+
+    preguntar(con, corpus, "Qué reel de oficio habla de afinar campanas?", baker=baker)
+    assert vistos and "recursos/reels/" in vistos[0] and "recursos/oficios/" not in vistos[0]
+
+
+def test_alcance_sin_el_tema_no_contesta_con_otra_carpeta(con):
+    corpus = Corpus("t", BOVEDA, alcances=((r"reel de oficio", "recursos/reels/**"),))
+
+    def baker(tarea, archivo):
+        raise AssertionError("no debía llamarse")
+
+    assert preguntar(con, corpus, "Qué reel de oficio habla de Valdeluna?", baker=baker).no_encontrado

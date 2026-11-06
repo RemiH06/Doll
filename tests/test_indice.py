@@ -187,6 +187,23 @@ def test_vecinas_tienen_tope(tmp_path, con):
     assert len(indice.buscar(con, "rueda", 1)) == 1 + indice.VECINAS
 
 
+def test_vecinas_salen_solo_de_la_mejor_nota(tmp_path, con):
+    relleno = "palabras sin relación con la consulta " * 8
+    corpus = boveda_chica(tmp_path / "v", mejor="rueda rueda rueda rueda [[cerca]]", otra="rueda rueda [[lejos]]",
+                          cerca=f"rueda {relleno}", lejos=f"rueda {relleno}")
+    indice.indexar(con, corpus)
+    rutas = [r.ruta for r in indice.buscar(con, "rueda", 2)]
+    assert rutas == ["mejor.md", "otra.md", "cerca.md"]
+
+
+def test_solo_limita_la_carpeta_tambien_en_vecinas(boveda, con):
+    corpus = Corpus("t", boveda)
+    indice.indexar(con, corpus)
+    filtro = indice.Filtro(solo=("recursos/oficios/**",))
+    assert {r.ruta.split("/")[0] for r in indice.buscar(con, "escape marcha reloj", 5, filtro)} == {"recursos"}
+    assert indice.buscar(con, "Valdeluna", 5, filtro) == []
+
+
 def test_filtra_por_tipo_y_dominio_en_lista(boveda, con):
     indice.indexar(con, Corpus("t", boveda))
     assert set(rutas(indice.buscar(con, "escape", 8, indice.Filtro(tipo="referencia")))) == {"recursos/oficios/Escapes.md"}

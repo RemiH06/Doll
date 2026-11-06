@@ -1,6 +1,7 @@
 """Qué notas pertenecen a un corpus. Toda lectura de la bóveda pasa por aquí."""
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -20,9 +21,18 @@ class Corpus:
     excluir: tuple[str, ...] = ()
     terceros: tuple[str, ...] = ()  # notas con texto ajeno: entrada no confiable
     mcp_excluir: tuple[str, ...] | None = None  # None: sin configurar, el MCP no arranca
+    alcances: tuple[tuple[str, str], ...] = ()  # (regex de la pregunta, carpeta a la que se limita)
 
     def es_terceros(self, relativa: str) -> bool:
         return any(PurePosixPath(relativa).full_match(p) for p in self.terceros)
+
+    def alcance(self, consulta: str) -> tuple[str, tuple[str, ...]]:
+        """La consulta sin la frase de alcance y las carpetas a las que se limita: esa frase no es el tema."""
+        for regex, carpeta in self.alcances:
+            resto, veces = re.subn(regex, " ", consulta, flags=re.IGNORECASE)
+            if veces:
+                return resto, (carpeta,)
+        return consulta, ()
 
     def incluida(self, relativa: str) -> bool:
         ruta = PurePosixPath(relativa)
@@ -65,5 +75,11 @@ def cargar(nombre: str) -> Corpus:
     if not ruta.is_dir():
         raise SystemExit(f"La ruta del corpus {nombre!r} no existe")
     mcp_excluir = datos.get("mcp_excluir")
+    alcances = tuple(datos.get("alcances", {}).items())
+    for regex, _ in alcances:
+        try:
+            re.compile(regex)
+        except re.error as e:
+            raise SystemExit(f"Regex inválida en alcances de {nombre!r}: {e}") from None
     return Corpus(nombre, ruta, tuple(datos.get("excluir", ())), tuple(datos.get("terceros", ())),
-                  None if mcp_excluir is None else tuple(mcp_excluir))
+                  None if mcp_excluir is None else tuple(mcp_excluir), alcances)
