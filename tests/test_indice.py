@@ -216,3 +216,26 @@ def test_frontmatter_invalido_avisa_y_la_nota_entra(tmp_path, con, capsys):
     indice.indexar(con, boveda_chica(tmp_path / "b", a="---\ndominio: [roto\n---\n# A\nrueda\n"))
     assert "a.md" in capsys.readouterr().err
     assert rutas(indice.buscar(con, "rueda", 1)) == ["a.md"]
+
+
+def test_ampliar_suma_secciones_de_la_mejor_nota_sin_duplicar(tmp_path, con):
+    boveda_chica(tmp_path, a="# Tema\n\nescape escape\n\n## Otra\n\nsin relación\n", b="# B\n\nescape\n\n## Fuera\n\nnada\n")
+    indice.indexar(con, Corpus("t", tmp_path))
+    base = indice.buscar(con, "escape", 5)
+    ampliados = indice.ampliar(con, base)
+    assert any("sin relación" in f.texto for f in ampliados)
+    assert not any("nada" in f.texto for f in ampliados)  # solo la mejor nota
+    assert len({(f.ruta, f.linea_ini) for f in ampliados}) == len(ampliados)
+
+
+def test_ampliar_respeta_el_tope(tmp_path, con):
+    relleno = "x " * (indice.TOPE_AMPLIAR // 2 + 1)
+    boveda_chica(tmp_path, a=f"# Tema\n\nescape\n\n## Larga\n\n{relleno}\n\n## Corta\n\nbreve\n")
+    indice.indexar(con, Corpus("t", tmp_path))
+    ampliados = indice.ampliar(con, indice.buscar(con, "escape", 5))
+    assert any("breve" in f.texto for f in ampliados)
+    assert not any("x x x" in f.texto for f in ampliados)
+
+
+def test_ampliar_sin_fragmentos(con):
+    assert indice.ampliar(con, []) == []

@@ -40,13 +40,14 @@ def _generacion(args) -> None:
     con, _ = _indice(args.corpus)
     eval_dir = corpus_mod.home() / "eval"
     g = evaluar_mod.evaluar_generacion(
-        evaluar_mod.cargar_preguntas(eval_dir / "preguntas.toml"),
+        evaluar_mod.cargar_preguntas(eval_dir / f"{args.set}.toml"),
         lambda consulta: preguntar(con, corpus, consulta, args.k),
-        eval_dir / "ultima.jsonl",
+        eval_dir / f"ultima-{args.set}.jsonl",
     )
     print(f"con citas reales: {g.con_citas}/{g.respondibles}")
     print(f"citan todas sus notas: {g.todas_las_notas}/{g.respondibles}")
     print(f"citan alguna nota esperada: {g.alguna_nota}/{g.respondibles}")
+    print(f"traen la evidencia: {g.traen_evidencia}/{g.con_evidencia} (sin ella: {' '.join(g.sin_evidencia) or 'ninguna'})")
     print(f"no respondibles detectadas: {g.no_encontrado}/{g.no_respondibles}")
     print(f"segundos promedio: {g.segundos_promedio:.1f}")
     print(f"fallos: {' '.join(g.fallos) or 'ninguno'}")
@@ -69,7 +70,7 @@ def _evaluar(args) -> None:
         return [(r.ruta, len(r.texto)) for r in indice.buscar(con, consulta, k)]
 
     motores = {"grep": lambda c, k: grep.buscar(c, notas, k), "fts": fts}
-    archivo = corpus_mod.home() / "eval" / "preguntas.toml"
+    archivo = corpus_mod.home() / "eval" / f"{args.set}.toml"
     reporte = evaluar_mod.evaluar(evaluar_mod.cargar_preguntas(archivo), motores[args.motor], args.k)
     print(f"motor {args.motor} | {len(notas)} notas | {sum(map(len, notas.values()))} chars")
     print(f"recall@{args.k}: {reporte.recall:.2f}")
@@ -103,8 +104,9 @@ def main() -> None:
     pr.add_argument("--dominio", help="solo notas con este dominio")
     pr.set_defaults(func=_preguntar)
 
-    ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/preguntas.toml")
+    ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/<set>.toml")
     ev.add_argument("--motor", default="fts", choices=["grep", "fts"])
+    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control"])
     ev.add_argument("--generacion", action="store_true", help="mide respuestas y citas con el Baker")
     ev.add_argument("-k", type=int, default=5)
     ev.set_defaults(func=_evaluar)

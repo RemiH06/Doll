@@ -3,10 +3,10 @@
 import re
 
 VACIAS = frozenset(
-    """a al algo como con cual cuales cuanto cuantos cuánto cuántos cuántas cuál cuáles
-    de del donde dónde e el ella en es esa ese eso esta este esto hay la las le lo los
-    me mi mis mí muy o para pero por porque que qué se si sin sobre son su sus te tengo
-    tu un una uno unos unas y ya yo""".split()
+    """a al algo como cómo con cual cuales cuanto cuantos cuánto cuántos cuántas cuál cuáles
+    de del donde dónde e el ella en es esa ese eso esta este esto ha han has hace hacer hay
+    he hizo la las le lo los me mi mis mí muy no o para pero por porque que qué se si sin
+    sobre son su sus te tengo tu un una uno unos unas y ya yo""".split()
 )
 
 

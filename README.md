@@ -55,7 +55,7 @@ mcp_excluir = ["borradores/**"]
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D]`: fragmentos con ruta y líneas.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll mcp`: servidor MCP por stdio, con las herramientas `buscar` y `preguntar_notas`.
-- `doll evaluar [--motor fts|grep] [--generacion] [-k N]`: mide contra `~/.doll/eval/preguntas.toml`.
+- `doll evaluar [--motor fts|grep] [--generacion] [--set preguntas|control] [-k N]`: mide contra `~/.doll/eval/<set>.toml`.
 - `--corpus NOMBRE`, antes del comando: elige el corpus; por defecto, `boveda`.
 
 ```bash
@@ -70,6 +70,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 - Filtro por `tipo` y `dominio` del frontmatter.
 - Un enlace a una nota excluida se tapa en el índice: no queda ni su nombre.
 - Servidor MCP para consultar las notas desde Claude Code.
+- `preguntar` le da al modelo el resto de la mejor nota; `buscar` entrega solo lo que coincide.
 - Citas comprobadas contra el texto recuperado; si ninguna sobrevive, responde "no encontrado".
 - Texto de terceros marcado como no confiable en el prompt y en la salida.
 - `buscar` sigue funcionando sin modelo, y `preguntar` lo dice y entrega los fragmentos.

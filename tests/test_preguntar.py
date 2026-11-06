@@ -137,3 +137,10 @@ def test_el_indice_copia_no_toca_la_boveda(tmp_path):
     con = indice.abrir(tmp_path / "x.db")
     indice.indexar(con, Corpus("t", copia))
     assert sorted(p.read_bytes() for p in copia.rglob("*.md")) == antes
+
+
+def test_cita_sin_el_enfasis_del_original_es_valida(corpus):
+    fragmento = indice.Resultado("n.md", "N", 1, 2, "**Nombre** · `18.Nombre`: una **idea** rara")
+    buenas, malas = verificar(["Nombre · `18.Nombre`: una idea rara", "Nombre: otra idea"], [fragmento], corpus)
+    assert [c.texto for c in buenas] == ["Nombre · `18.Nombre`: una idea rara"]
+    assert malas == ["Nombre: otra idea"]

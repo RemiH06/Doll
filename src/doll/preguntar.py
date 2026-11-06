@@ -57,7 +57,8 @@ def _bake(tarea: str, archivo: str) -> dict:
 
 
 def _plano(texto: str) -> str:
-    return " ".join(texto.split())
+    # Sin `*`: se pide citar sin markdown, y el énfasis del original no cambia las palabras.
+    return " ".join(texto.replace("*", "").split())
 
 
 def verificar(citas: list[str], fragmentos: list[Resultado], corpus: Corpus) -> tuple[list[Cita], list[str]]:
@@ -143,7 +144,8 @@ def _generar(fragmentos: list[Resultado], corpus: Corpus, consulta: str, baker: 
 def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5, baker: Baker = _bake,
               filtro: Filtro = Filtro()) -> Respuesta:
     inicio = time.perf_counter()
-    fragmentos = indice.buscar(con, consulta, k, filtro)
+    # Solo aquí: `buscar` entrega lo mínimo a quien paga cada carácter de contexto.
+    fragmentos = indice.ampliar(con, indice.buscar(con, consulta, k, filtro))
     if not fragmentos:
         r = Respuesta(no_encontrado=True)
     else:

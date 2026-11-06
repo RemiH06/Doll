@@ -51,6 +51,7 @@ CAMPOS = ("tipo", "estado", "dominio")  # los valores salen de las notas, no del
 ENLACE_OCULTO = "[[…]]"  # sin letras: no debe ser un término buscable
 TOPE_POR_NOTA = 2  # si no, varios fragmentos de una nota llenan el top k
 VECINAS = 3
+TOPE_AMPLIAR = 4000  # chars de la mejor nota; más no trajo más evidencia en el set
 
 
 class Resultado(NamedTuple):
@@ -222,3 +223,20 @@ def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filt
             elegidos.append(r)
             vecinas.discard(r.ruta)
     return elegidos
+
+
+def ampliar(con: sqlite3.Connection, fragmentos: list[Resultado]) -> list[Resultado]:
+    """Suma los demás fragmentos de la mejor nota: el dato suele estar en una sección sin términos de la pregunta."""
+    if not fragmentos:
+        return []
+    ruta = fragmentos[0].ruta
+    presentes = {f.linea_ini for f in fragmentos if f.ruta == ruta}
+    total = sum(len(f.texto) for f in fragmentos if f.ruta == ruta)
+    salida = list(fragmentos)
+    filas = con.execute("SELECT ruta, encabezado, linea_ini, linea_fin, texto FROM fragmentos"
+                        " WHERE ruta = ? ORDER BY linea_ini", (ruta,))
+    for r in map(Resultado._make, filas):
+        if r.linea_ini not in presentes and total + len(r.texto) <= TOPE_AMPLIAR:
+            salida.append(r)
+            total += len(r.texto)
+    return salida

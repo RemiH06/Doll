@@ -50,3 +50,15 @@ def test_generacion_exige_citar_todas_las_notas(tmp_path):
     g = evaluar_generacion(preguntas, salidas.__getitem__, tmp_path / "s.jsonl")
     assert (g.todas_las_notas, g.alguna_nota, g.respondibles) == (1, 2, 2)
     assert g.no_encontrado == 1 and g.fallos == ["b"]
+
+
+def test_citar_la_nota_sin_el_dato_no_trae_evidencia(tmp_path):
+    preguntas = [{"id": "a", "tipo": "directa", "pregunta": "¿cuál?", "notas": [ESCAPES], "evidencia": ["áncora suiza"]},
+                 {"id": "b", "tipo": "directa", "pregunta": "¿otra?", "notas": [ESCAPES], "evidencia": ["Áncora  suiza"]},
+                 {"id": "c", "tipo": "directa", "pregunta": "¿sin?", "notas": [ESCAPES]}]
+    respuestas = iter([Respuesta(texto="otra cosa", citas=[Cita("otra cosa", ESCAPES, 1, 2, False)]),
+                       Respuesta(texto="la áncora suiza", citas=[Cita("texto", ESCAPES, 1, 2, False)]),
+                       Respuesta(texto="x", citas=[Cita("x", ESCAPES, 1, 2, False)])])
+    g = evaluar_generacion(preguntas, lambda _: next(respuestas), tmp_path / "s.jsonl")
+    assert g.todas_las_notas == 3
+    assert (g.traen_evidencia, g.con_evidencia, g.sin_evidencia) == (1, 2, ["a"])

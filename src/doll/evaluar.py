@@ -4,10 +4,14 @@ import json
 import time
 import tomllib
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 Motor = Callable[[str, int], list[tuple[str, int]]]
+
+
+def _plano(texto: str) -> str:
+    return " ".join(texto.split()).casefold()
 
 
 def cargar_preguntas(archivo: Path) -> list[dict]:
@@ -58,12 +62,21 @@ class ReporteGeneracion:
     no_respondibles: int
     segundos_promedio: float
     fallos: list[str]
+    traen_evidencia: int = 0  # citar la nota no prueba contestar: el dato etiquetado debe salir
+    con_evidencia: int = 0
+    sin_evidencia: list[str] = field(default_factory=list)
+
+
+def _trae_evidencia(p: dict, r) -> bool:
+    salida = _plano(" ".join([r.texto, *(c.texto for c in r.citas)]))
+    return all(_plano(e) in salida for e in p["evidencia"])
 
 
 def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path) -> ReporteGeneracion:
     """Corre `responder(pregunta)` y guarda cada respuesta completa para leerla: acertar no prueba no inventar."""
     con_citas = todas_las_notas = alguna_nota = no_encontrado = respondibles = no_respondibles = 0
-    fallos, tiempos = [], []
+    traen = con_evidencia = 0
+    fallos, tiempos, sin_evidencia = [], [], []
     with salida.open("w", encoding="utf-8") as f:
         for p in preguntas:
             inicio = time.perf_counter()
@@ -83,9 +96,15 @@ def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path)
                 no_encontrado += acierto
             if not acierto:
                 fallos.append(p["id"])
+            if p.get("evidencia"):
+                con_evidencia += 1
+                trae = _trae_evidencia(p, r)
+                traen += trae
+                if not trae:
+                    sin_evidencia.append(p["id"])
             f.write(json.dumps({"id": p["id"], "acierto": acierto, "respuesta": r.texto, "fallo": r.fallo,
                                 "descartadas": r.citas_descartadas, "intentos": r.intentos,
                                 "citas": [(c.ruta, c.texto) for c in r.citas]}, ensure_ascii=False) + "\n")
             f.flush()
     return ReporteGeneracion(con_citas, todas_las_notas, alguna_nota, respondibles, no_encontrado, no_respondibles,
-                             sum(tiempos) / max(len(tiempos), 1), fallos)
+                             sum(tiempos) / max(len(tiempos), 1), fallos, traen, con_evidencia, sin_evidencia)
