@@ -1,9 +1,11 @@
 """Respuesta generada: recupera, llama al Baker `doll` y verifica cada cita por código."""
 
 import json
+import re
 import sqlite3
 import tempfile
 import time
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -59,6 +61,19 @@ def _bake(tarea: str, archivo: str) -> dict:
 def _plano(texto: str) -> str:
     # Sin `*`: se pide citar sin markdown, y el énfasis del original no cambia las palabras.
     return " ".join(texto.replace("*", "").split())
+
+
+def _sin_acentos(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", texto) if not unicodedata.combining(c)).casefold()
+
+
+def nombres_faltantes(consulta: str, fragmentos: list[Resultado]) -> set[str]:
+    """Nombres propios de la pregunta que no salen en lo recuperado: Bonsai contesta igual si le basta el tema."""
+    # La primera palabra de cada frase lleva mayúscula sin ser nombre.
+    nombres = {p for frase in re.split(r"[.?!¿¡]+", consulta)
+               for p in re.findall(r"\w[\w-]*", frase)[1:] if p[0].isupper()}
+    texto = _sin_acentos(" ".join(f"{f.ruta} {f.encabezado} {f.texto}" for f in fragmentos))
+    return {n for n in nombres if _sin_acentos(n) not in texto}
 
 
 def verificar(citas: list[str], fragmentos: list[Resultado], corpus: Corpus) -> tuple[list[Cita], list[str]]:
@@ -146,7 +161,7 @@ def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5
     inicio = time.perf_counter()
     # Solo aquí: `buscar` entrega lo mínimo a quien paga cada carácter de contexto.
     fragmentos = indice.ampliar(con, indice.buscar(con, consulta, k, filtro))
-    if not fragmentos:
+    if not fragmentos or nombres_faltantes(consulta, fragmentos):
         r = Respuesta(no_encontrado=True)
     else:
         try:

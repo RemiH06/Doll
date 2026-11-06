@@ -6,7 +6,7 @@ import pytest
 
 from doll import indice
 from doll.corpus import Corpus
-from doll.preguntar import AVISO_TERCEROS, BakerCaido, contexto, preguntar, verificar
+from doll.preguntar import AVISO_TERCEROS, BakerCaido, contexto, nombres_faltantes, preguntar, verificar
 
 BOVEDA = Path(__file__).parent / "boveda"
 PREGUNTA_SECRETA = "pregunta secreta sobre el escape de áncora"
@@ -144,3 +144,16 @@ def test_cita_sin_el_enfasis_del_original_es_valida(corpus):
     buenas, malas = verificar(["Nombre · `18.Nombre`: una idea rara", "Nombre: otra idea"], [fragmento], corpus)
     assert [c.texto for c in buenas] == ["Nombre · `18.Nombre`: una idea rara"]
     assert malas == ["Nombre: otra idea"]
+
+
+def test_nombre_ausente_no_llama_al_modelo(con, corpus):
+    def baker(tarea, archivo):
+        raise AssertionError("no debía llamarse")
+
+    assert preguntar(con, corpus, "¿Qué dijo Zacarías sobre el escape de áncora?", baker=baker).no_encontrado
+
+
+def test_nombres_faltantes_ignora_inicio_de_frase_y_acentos():
+    fragmento = indice.Resultado("a/Nota.md", "N", 1, 2, "Tobías y Rueda están aquí")
+    assert nombres_faltantes("Qué es Tobías? Por qué en Rueda?", [fragmento]) == set()
+    assert nombres_faltantes("Habla de TOBIAS y de Zacarías", [fragmento]) == {"Zacarías"}
