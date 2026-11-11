@@ -57,8 +57,9 @@ mcp_excluir = ["borradores/**"]
 - `doll indexar`: sincroniza el índice con las notas; solo reprocesa las que cambiaron.
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D]`: fragmentos con ruta y líneas.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
+- `doll acomodar RUTA...`: propone clase y enlaces para notas de una carpeta con tabla de clases; no escribe nada.
 - `doll mcp`: servidor MCP por stdio, con las herramientas `buscar` y `preguntar_notas`.
-- `doll evaluar [--motor fts|grep] [--generacion] [--set preguntas|control|nuevas|confirmacion|docs] [-k N]`: mide contra `~/.doll/eval/<set>.toml`.
+- `doll evaluar [--motor fts|grep] [--generacion] [--set preguntas|control|nuevas|confirmacion|docs|acomodar] [-k N]`: mide contra `~/.doll/eval/<set>.toml`.
 - `--corpus NOMBRE`, antes del comando: elige el corpus; por defecto, `boveda`.
 
 ```bash
@@ -80,6 +81,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 - Texto de terceros marcado como no confiable en el prompt y en la salida.
 - `buscar` sigue funcionando sin modelo, y `preguntar` lo dice y entrega los fragmentos.
 - Log local con tiempos y conteos, sin preguntas ni fragmentos.
+- `acomodar` propone la clase de una nota con el Baker `clasificador` y sus enlaces según la tabla de clases de la carpeta. La clase que la nota ya trae no entra al modelo, y nada se escribe: la propuesta la aplica una persona.
 
 ## Limitaciones
 
@@ -93,10 +95,11 @@ Medido con un modelo local contra preguntas privadas sobre un corpus real.
 - El chequeo de nombres solo reconoce palabras con mayúscula, y basta con que el nombre salga en cualquier fragmento recuperado.
 - Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
 - Las preguntas de recuperación y de generación se ajustaron sobre el mismo set, y ningún set es del todo ciego.
+- `acomodar` acertó la clase en 29 de 34 notas etiquetadas (85 %) y los enlaces en 29 de 34. No es ciego: las etiquetas partieron de la clase que ya había puesto el mismo clasificador. Solo cubre notas de una carpeta con tabla de clases; todavía no propone carpeta ni proyecto para otras notas.
 
 ## Future Features
 
-- Acomodar notas nuevas con propuestas de carpeta, etiquetas y enlaces.
+- Acomodar notas que no traen tabla de clases: propuestas de carpeta, etiquetas y proyecto.
 
 ## Autoría
 

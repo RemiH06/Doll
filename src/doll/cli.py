@@ -56,9 +56,7 @@ def _generacion(args) -> None:
 def _acomodar(args) -> None:
     from doll.acomodar import acomodar, texto_propuestas
 
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
-    print(texto_propuestas(acomodar(corpus, args.rutas, con)))
+    print(texto_propuestas(acomodar(corpus_mod.cargar(args.corpus), args.rutas)))
 
 
 def _evaluar_acomodar(args) -> None:
@@ -67,10 +65,9 @@ def _evaluar_acomodar(args) -> None:
     from doll.acomodar import acomodar
 
     corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
     eval_dir = corpus_mod.home() / "eval"
     etiquetas = tomllib.loads((eval_dir / "acomodar.toml").read_text(encoding="utf-8"))["notas"]
-    propuestas = acomodar(corpus, [e["ruta"] for e in etiquetas], con)
+    propuestas = acomodar(corpus, [e["ruta"] for e in etiquetas])
     r = evaluar_mod.evaluar_acomodar(etiquetas, propuestas, corpus.notas(), eval_dir / "ultima-acomodar.jsonl")
     print(f"clase: {r.clase}/{r.total} ({r.clase / r.total:.0%})")
     print(f"enlaces exactos: {r.enlaces}/{r.total}")
