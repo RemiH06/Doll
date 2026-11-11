@@ -1,6 +1,7 @@
 """Mide un motor de búsqueda contra el set privado de preguntas."""
 
 import json
+import re
 import time
 import tomllib
 from collections.abc import Callable
@@ -56,6 +57,39 @@ def evaluar(preguntas: list[dict], motor: Motor, k: int = 5) -> Reporte:
         if not acierto:
             fallos.append(p["id"])
     return Reporte(por_tipo, fallos, sum(chars) / max(len(chars), 1), max(tiempos, default=0.0))
+
+
+@dataclass
+class ReporteAcomodar:
+    clase: int  # la que cuenta para el 80 %
+    enlaces: int  # mismo conjunto que la etiqueta
+    previa: int  # el `clase:` que la nota ya traía, de `analizar`: referencia, no meta
+    total: int
+    fallos: list[str]
+
+
+def _clase_previa(texto: str) -> str | None:
+    m = re.match(r"---\n(.*?)\n---\n", texto, re.DOTALL)
+    c = m and re.search(r"(?m)^clase:\s*(\S+)", m[1])
+    return c[1] if c else None
+
+
+def evaluar_acomodar(etiquetas: list[dict], propuestas: list, notas: dict[str, str], salida: Path) -> ReporteAcomodar:
+    """Compara cada propuesta con su etiqueta; `etiquetas` y `propuestas` van en el mismo orden."""
+    clase = enlaces = previa = 0
+    fallos = []
+    with salida.open("w", encoding="utf-8") as f:
+        for n, (e, p) in enumerate(zip(etiquetas, propuestas, strict=True), 1):
+            acierto = p.clase == e["clase"]
+            clase += acierto
+            enlaces += set(p.enlaces) == set(e.get("enlaces", ()))
+            previa += _clase_previa(notas[e["ruta"]]) == e["clase"]
+            if not acierto:
+                fallos.append(f"{n}:{e['clase']}->{p.clase}")
+            f.write(json.dumps({"n": n, "ruta": e["ruta"], "esperada": e["clase"], "propuesta": p.clase,
+                                "enlaces_esperados": e.get("enlaces", []), "enlaces": list(p.enlaces)},
+                               ensure_ascii=False) + "\n")
+    return ReporteAcomodar(clase, enlaces, previa, len(etiquetas), fallos)
 
 
 @dataclass

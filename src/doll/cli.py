@@ -53,6 +53,31 @@ def _generacion(args) -> None:
     print(f"fallos: {' '.join(g.fallos) or 'ninguno'}")
 
 
+def _acomodar(args) -> None:
+    from doll.acomodar import acomodar, texto_propuestas
+
+    corpus = corpus_mod.cargar(args.corpus)
+    con, _ = _indice(args.corpus)
+    print(texto_propuestas(acomodar(corpus, args.rutas, con)))
+
+
+def _evaluar_acomodar(args) -> None:
+    import tomllib
+
+    from doll.acomodar import acomodar
+
+    corpus = corpus_mod.cargar(args.corpus)
+    con, _ = _indice(args.corpus)
+    eval_dir = corpus_mod.home() / "eval"
+    etiquetas = tomllib.loads((eval_dir / "acomodar.toml").read_text(encoding="utf-8"))["notas"]
+    propuestas = acomodar(corpus, [e["ruta"] for e in etiquetas], con)
+    r = evaluar_mod.evaluar_acomodar(etiquetas, propuestas, corpus.notas(), eval_dir / "ultima-acomodar.jsonl")
+    print(f"clase: {r.clase}/{r.total} ({r.clase / r.total:.0%})")
+    print(f"enlaces exactos: {r.enlaces}/{r.total}")
+    print(f"clase que ya traía la nota: {r.previa}/{r.total}")
+    print(f"fallos: {' '.join(r.fallos) or 'ninguno'}")
+
+
 def _mcp(args) -> None:
     from doll.mcp_server import crear  # import aquí: la CLI no carga el paquete mcp
 
@@ -60,6 +85,8 @@ def _mcp(args) -> None:
 
 
 def _evaluar(args) -> None:
+    if args.set == "acomodar":
+        return _evaluar_acomodar(args)
     if args.generacion:
         return _generacion(args)
     corpus = corpus_mod.cargar(args.corpus)
@@ -106,10 +133,14 @@ def main() -> None:
 
     ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/<set>.toml")
     ev.add_argument("--motor", default="fts", choices=["grep", "fts"])
-    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs"])
+    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs", "acomodar"])
     ev.add_argument("--generacion", action="store_true", help="mide respuestas y citas con el Baker")
     ev.add_argument("-k", type=int, default=5)
     ev.set_defaults(func=_evaluar)
+
+    ac = subs.add_parser("acomodar", help="propone clase y enlaces de notas de inspiración; no escribe")
+    ac.add_argument("rutas", nargs="+", help="relativas a la bóveda, todas en la carpeta de la tabla de clases")
+    ac.set_defaults(func=_acomodar)
 
     mc = subs.add_parser("mcp", help="servidor MCP por stdio")
     mc.set_defaults(func=_mcp)

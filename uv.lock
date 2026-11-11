@@ -40,7 +40,7 @@ wheels = [
 [[package]]
 name = "bakers"
 version = "0.1.0"
-source = { git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers#bd90bd7aee5a9599ac1e8812a7e876e295c77e10" }
+source = { git = "https://github.com/RemiH06/Bakery.git?subdirectory=bakers#d9d190c4f762d638302042ab518be15969f9f03d" }
 dependencies = [
     { name = "httpx" },
     { name = "mcp" },
