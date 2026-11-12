@@ -108,16 +108,16 @@ claude mcp add --scope user doll -- uv run --no-sync --project /ruta/a/Doll doll
 
 Medido con un modelo local contra preguntas privadas sobre un corpus real.
 
-- Sobre más de 400 notas, en un set nuevo: citó todas sus notas en 19 de 22 preguntas con respuesta, y el dato exacto salió en 17 de 22. Citar la nota no prueba contestar. En los sets de ajuste baja a cerca del 75 %.
+- Sobre 521 notas, en un set nuevo: citó todas sus notas en 19 de 22 preguntas con respuesta, y el dato exacto salió en 17 de 22. Citar la nota no prueba contestar. En los sets de ajuste baja a cerca del 75 %.
 - En ese set rechazó las 11 preguntas sin respuesta, después de reclasificar 2 que sí se podían contestar; en otras pruebas limpias rechazó 5 de 7. Si el tema aparece en las notas, puede contestar algo cercano con citas reales: una cita verificada prueba que el texto existe, no que responda la pregunta.
 - A veces dice "no encontrado" aunque el dato esté en lo recuperado.
 - La búsqueda es por palabras: si la pregunta usa otro vocabulario que la nota, puede no encontrarla.
 - El alcance solo actúa con las frases configuradas y por carpeta: "qué dice X sobre Y" puede contestar con otra nota.
 - El chequeo de nombres solo reconoce palabras con mayúscula, y basta con que el nombre salga en cualquier fragmento recuperado.
-- Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
+- Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir. Pasó al llegar a 521 notas: tres notas recortadas sobre un mismo tema llenaron los 5 lugares y una pregunta perdió la ficha de proyecto que también necesitaba. Ni el alcance por carpeta ni la fusión con vectores la recuperan.
 - Las preguntas de recuperación y de generación se ajustaron sobre el mismo set, y ningún set es del todo ciego.
 - `acomodar` acertó la clase en 29 de 34 notas etiquetadas (85 %) y los enlaces en 29 de 34. No es ciego: las etiquetas partieron de la clase que ya había puesto el mismo clasificador. Solo cubre notas de una carpeta con tabla de clases.
-- Para las demás notas, en 30 notas etiquetadas y medidas en dos mitades: carpeta 26/30 (87 %), `tipo` 22/30, `estado` 22/30, dominio principal 29/30 y proyecto 12/17 (sin contar fichas, donde el título lo dice). `tipo` y proyecto son sugerencias que hay que revisar: una nota que se apoya en varios proyectos suele quedar sin ninguno. Los enlaces por FTS tienen precisión 0.31 y recall 0.42. Cambiar una nota del lote movió una propuesta de carpeta en otra: las notas del lote le dan contexto al modelo. No es ciego: las etiquetas salen del frontmatter de las notas.
+- Para las demás notas, en 30 notas etiquetadas y medidas en dos mitades: carpeta 26/30 (87 %), `tipo` 23/30, `estado` 23/30, dominio principal 30/30 y proyecto 12/17 (sin contar fichas, donde el título lo dice). `tipo` y proyecto son sugerencias que hay que revisar: una nota que se apoya en varios proyectos suele quedar sin ninguno. Los enlaces por FTS tienen precisión 0.29 y recall 0.41. Cambiar una nota del lote movió una propuesta de carpeta en otra: las notas del lote le dan contexto al modelo. No es ciego: las etiquetas salen del frontmatter de las notas.
 - `acomodar` manda todas las notas en una sola llamada a propósito. Con lotes de 10, 5 o 1 nota acertó 24 de 34: las otras notas del lote le sirven de contexto al modelo.
 
 Probado y descartado, con las mismas preguntas y etiquetas:
