@@ -1,6 +1,6 @@
 [project]
 name = "doll"
-version = "0.1.0"
+version = "0.2.0"
 description = "RAG local sobre notas Markdown, con citas verificadas por código"
 authors = [
     { name = "RemLam" }

@@ -10,7 +10,7 @@
 ██████╔╝╚██████╔╝███████╗███████╗
 ╚═════╝  ╚═════╝ ╚══════╝╚══════╝
 
-       by RemLam (@RemiH06)          version 0.1.0
+       by RemLam (@RemiH06)          version 0.2.0
 ```
 
 ![AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge)
@@ -87,7 +87,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 
 Medido con un modelo local contra preguntas privadas sobre un corpus real.
 
-- Sobre 337 notas, en un set nuevo: citó todas sus notas en 19 de 22 preguntas con respuesta, y el dato exacto salió en 17 de 22. Citar la nota no prueba contestar. En los sets de ajuste baja a cerca del 75 %.
+- Sobre más de 400 notas, en un set nuevo: citó todas sus notas en 19 de 22 preguntas con respuesta, y el dato exacto salió en 17 de 22. Citar la nota no prueba contestar. En los sets de ajuste baja a cerca del 75 %.
 - En ese set rechazó las 11 preguntas sin respuesta, después de reclasificar 2 que sí se podían contestar; en otras pruebas limpias rechazó 5 de 7. Si el tema aparece en las notas, puede contestar algo cercano con citas reales: una cita verificada prueba que el texto existe, no que responda la pregunta.
 - A veces dice "no encontrado" aunque el dato esté en lo recuperado.
 - La búsqueda es por palabras: si la pregunta usa otro vocabulario que la nota, puede no encontrarla.
