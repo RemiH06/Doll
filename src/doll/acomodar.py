@@ -8,7 +8,7 @@ los del destino de la clase en la tabla de clases.
 Las demás (`acomodar_nota`): carpeta, `tipo`, `estado`, dominio principal, proyecto y enlaces. El modelo lee de cada
 nota su título y el inicio del cuerpo, sin frontmatter, ruta ni `[[...]]`. Las opciones salen del índice y se
 describen con notas que ya las tienen; las notas que se acomodan no cuentan como ejemplo, porque una nota nueva
-todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 23/30 y proyecto 11/17 quedan bajo el 80 %.
+todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 22/30 y proyecto 11/17 quedan bajo el 80 %.
 """
 
 import re
@@ -28,9 +28,9 @@ ENLACE = re.compile(r"\[\[([^\]|#\\]+)")
 CON_ALIAS = re.compile(r"!?\[\[([^\]|]*)(?:\|([^\]]*))?\]\]")
 FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
 LARGO = 600  # chars de cada nota al modelo; 1500 no subió tipo ni proyecto
-PURA = 0.6  # si esta fracción de la carpeta comparte tipo o estado, se toma de ahí: estado 23/30 contra 13 del modelo
+PURA = 0.6  # si esta fracción de la carpeta comparte tipo o estado, se toma de ahí: estado 22/30 contra 13 del modelo
 EJEMPLOS = 6
-ENLACES = 3  # por FTS: precisión 0.29, recall 0.41
+ENLACES = 3  # por FTS: precisión 0.31, recall 0.42
 NOTA_INDICE = "README.md"  # describe las carpetas de la bóveda
 TIPO_PROYECTO, FICHA = "proyecto", "ficha"  # una nota con `ficha:` pertenece a otro proyecto: no es candidata
 NINGUNO = "ninguno"
