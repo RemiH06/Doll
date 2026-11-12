@@ -1,17 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t">
-  <title id="t">Doll</title>
-  <g fill="none" stroke="#a56872" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="32" cy="15" r="9.5"/>
-    <rect x="22" y="27" width="20" height="20" rx="8"/>
-    <path d="M23 31 q-7 2 -9 10 M41 31 q7 2 9 10 M27 47 q-1 6 -3 10 M37 47 q1 6 3 10"/>
-  </g>
-  <path d="M22.5 13 q-4 1 -4 6 M22.5 13 q-3 -6 2 -8 q1 -4 5 -2 q2 -3 5 0 q4 -2 5 2 q5 2 2 8 M41.5 13 q4 1 4 6" fill="none" stroke="#a56872" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <g fill="#e23350">
-    <circle cx="28.5" cy="14" r="2"/>
-    <circle cx="35.5" cy="14" r="2"/>
-  </g>
-  <g fill="none" stroke="#e23350" stroke-width="2.2" stroke-linecap="round">
-    <path d="M28.5 19.5 q3.5 2.5 7 0"/>
-    <path d="M32 31 V43" stroke-dasharray="2 3"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Doll</title>
+<path d="M14 19 H31 A21 21 0 0 1 31 61 H14 Z" fill="#db357b"/>
+<path d="M20 25 H31 A15 15 0 0 1 31 55 H20 Z" fill="none" stroke="#f7eef2" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3.5 3"/>
+<circle cx="31" cy="40" r="4.2" fill="#f7eef2"/><circle cx="29.6" cy="38.6" r=".9" fill="#5a1a3a"/><circle cx="32.4" cy="41.4" r=".9" fill="#5a1a3a"/>
+<g transform="translate(20 15) rotate(-22) scale(1.45)" fill="#bf5581" stroke="#f7eef2" stroke-width="1.2" stroke-linejoin="round">
+<path d="M-1 1 L-6 11 L-3 10 L-1.5 12.5 Z M1 1 L5 11 L2 10.5 L0.5 12.8 Z"/>
+<path d="M0 0 C-4 -8 -14 -7 -13 0 C-14 7 -4 8 0 0 Z M0 0 C4 -8 14 -7 13 0 C14 7 4 8 0 0 Z"/>
+<circle r="3"/>
+</g>
 </svg>

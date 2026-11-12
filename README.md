@@ -1,5 +1,3 @@
-<p align="center"><img src="docs/logo.svg" width="128" alt="Doll, una muñeca de trapo con costuras"></p>
-
 ![Made with Python](https://forthebadge.com/images/badges/made-with-python.svg)
 ![SQLite](https://img.shields.io/badge/-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Rust](https://img.shields.io/badge/-Rust-000000?style=for-the-badge&logo=rust&logoColor=white)
@@ -23,7 +21,7 @@
 
 El código es público y los datos no: los índices, la configuración de cada corpus y las preguntas de evaluación viven en `~/.doll/`. Los ejemplos y las pruebas usan solo la bóveda ficticia de `tests/boveda/`.
 
-Más detalle en [`docs/`](docs/): [arquitectura](docs/arquitectura.md), [configuración](docs/configuracion.md) y [evaluación](docs/evaluacion.md).
+Más detalle en [`docs/`](docs/): [arquitectura](docs/arquitectura.md), [configuración](docs/configuracion.md) y [evaluación](docs/evaluacion.md). Para que un agente use Doll hay dos skills de ejemplo en [`skills/`](skills/).
 
 ```diff
 - En desarrollo: funciona en la CLI; la interfaz puede cambiar.

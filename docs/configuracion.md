@@ -48,6 +48,8 @@ Herramientas: `buscar`, `buscar_inspiracion` (por sentido, en notas de terceros)
 
 `--no-sync` evita que `uv` intente reinstalar `doll.exe` al arrancar: en Windows eso falla si otra sesión tiene el servidor abierto. Después de un `uv sync`, reinicia las sesiones que usan el MCP.
 
+Las skills de ejemplo de [`skills/`](../skills/) le dicen a un agente cuándo usar cada herramienta: `doll-notas` para buscar y `doll-acomodar` para proponer dónde va una nota. En Claude Code se instalan copiando cada carpeta a `~/.claude/skills/`.
+
 ## Instalar sin Rust
 
 `uv sync` compila `doll-parser` con `cargo`. En una máquina sin Rust, compílalo donde sí lo haya y lleva el wheel:
