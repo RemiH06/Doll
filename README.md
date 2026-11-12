@@ -96,6 +96,12 @@ Medido con un modelo local contra preguntas privadas sobre un corpus real.
 - Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
 - Las preguntas de recuperación y de generación se ajustaron sobre el mismo set, y ningún set es del todo ciego.
 - `acomodar` acertó la clase en 29 de 34 notas etiquetadas (85 %) y los enlaces en 29 de 34. No es ciego: las etiquetas partieron de la clase que ya había puesto el mismo clasificador. Solo cubre notas de una carpeta con tabla de clases; todavía no propone carpeta ni proyecto para otras notas.
+- `acomodar` manda todas las notas en una sola llamada a propósito. Con lotes de 10, 5 o 1 nota acertó 24 de 34: las otras notas del lote le sirven de contexto al modelo.
+
+Probado y descartado, con las mismas preguntas y etiquetas:
+
+- **Búsqueda híbrida con vectores** (bge-m3 y fusión RRF con FTS5): recupera paráfrasis que FTS5 pierde, pero hace perder otras preguntas, en 2 de 5 sets con RRF a partes iguales y en 1 de 5 al darle el doble de peso a FTS5. FTS5 sigue sola.
+- **[Laya](https://huggingface.co/convaiinnovations/laya-multilingual) en lugar del clasificador:** sin especializar, acertó la clase en 11 de 34 notas en su mejor variante, contra 29 de 34. Es unas 5 veces más rápido, pero da confianzas altas cuando se equivoca, y especializarlo pide cientos de notas bien etiquetadas.
 
 ## Future Features
 
