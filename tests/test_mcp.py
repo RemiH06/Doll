@@ -59,3 +59,10 @@ def test_preguntar_no_ve_lo_excluido_y_sin_gateway_lo_dice(home):
 def test_k_fuera_de_rango_no_rompe(home):
     configurar(home, home / "boveda", "mcp_excluir = []")
     assert "Escapes" in llamar(mcp_server.crear("t"), "buscar", consulta="escape cilindro", k=-3)
+
+
+def test_buscar_inspiracion_sin_gateway_usa_fts_solo_en_terceros(home):
+    configurar(home, home / "boveda", "mcp_excluir = []")
+    salida = llamar(mcp_server.crear("t"), "buscar_inspiracion", consulta="campana torre escape")
+    assert salida.startswith("Sin búsqueda por sentido") and "Afinar campanas" in salida
+    assert "Reloj de torre" not in salida and "Escapes" not in salida

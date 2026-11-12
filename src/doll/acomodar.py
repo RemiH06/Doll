@@ -8,7 +8,11 @@ los del destino de la clase en la tabla de clases.
 Las demás (`acomodar_nota`): carpeta, `tipo`, `estado`, dominio principal, proyecto y enlaces. El modelo lee de cada
 nota su título y el inicio del cuerpo, sin frontmatter, ruta ni `[[...]]`. Las opciones salen del índice y se
 describen con notas que ya las tienen; las notas que se acomodan no cuentan como ejemplo, porque una nota nueva
-todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 22/30 y proyecto 12/17 quedan bajo el 80 %.
+todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 22/30 queda bajo el 80 %.
+
+Proyecto (iteración 7, 15/17): en una carpeta donde la mayoría de las notas llevan `ficha:`, la nota sí tiene proyecto.
+Ahí el modelo lee la nota completa y elige solo entre los proyectos que la nota nombra, en una llamada por nota: con
+toda la lista y la opción `ninguno`, Bonsai contestaba `ninguno` o la última opción. En las demás carpetas lee el inicio.
 """
 
 import re
@@ -28,6 +32,7 @@ ENLACE = re.compile(r"\[\[([^\]|#\\]+)")
 CON_ALIAS = re.compile(r"!?\[\[([^\]|]*)(?:\|([^\]]*))?\]\]")
 FRONTMATTER = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
 LARGO = 600  # chars de cada nota al modelo; 1500 no subió tipo ni proyecto
+LARGO_FICHA = 6000  # la nota completa cuando su carpeta usa `ficha:`: el proyecto suele estar al final
 PURA = 0.6  # si esta fracción de la carpeta comparte tipo o estado, se toma de ahí: estado 22/30 contra 13 del modelo
 EJEMPLOS = 6
 ENLACES = 3  # por FTS: precisión 0.31, recall 0.42
@@ -100,6 +105,8 @@ def _carpeta(ruta: str) -> str:
 
 
 def _clasificar(tarea: str, categorias: list[str], renglones: list[str]) -> list[str | None]:
+    if not renglones:
+        return []
     if len(set(categorias)) < 2:  # el gateway pide al menos dos
         return [categorias[0] if categorias else None] * len(renglones)
     with tempfile.TemporaryDirectory() as d:
@@ -146,7 +153,8 @@ def _facetas(con: sqlite3.Connection, notas: dict[str, str]) -> dict[str, dict[s
 
 def acomodar_nota(con: sqlite3.Connection, corpus: Corpus, rutas: list[str]) -> list[PropuestaNota]:
     """Una propuesta por nota que no es de terceros, en el orden de `rutas`. `con`: el índice al día. Hasta cinco
-    llamadas al gateway: carpeta, dominio, proyecto, y `tipo` y `estado` solo para notas de carpetas mezcladas."""
+    llamadas al gateway: carpeta, dominio, proyecto, y `tipo` y `estado` solo para notas de carpetas mezcladas. Más
+    una por nota de carpeta con `ficha:` que nombre dos proyectos o más, o ninguno."""
     notas = corpus.notas()
     _existen(rutas, notas)
     if any(corpus.es_terceros(r) for r in rutas):
@@ -203,15 +211,49 @@ def acomodar_nota(con: sqlite3.Connection, corpus: Corpus, rutas: list[str]) -> 
     dominio = _clasificar(f"{ENTRADA}Pick the main domain of the note.\nDomains:\n{opciones('dominio')}",
                           valores("dominio"), renglones)
 
-    proyectos = [r for r, f in facetas.items() if TIPO_PROYECTO in f.get("tipo", [])
-                 and not re.search(rf"(?m)^{FICHA}:", (FRONTMATTER.match(notas[r]) or [""])[0])]
-    lista = "\n".join(f"- {PurePosixPath(r).stem}: {renglon(notas[r], 140)}" for r in proyectos)
-    proyecto = _clasificar(f"{ENTRADA}Pick the project the note belongs to, or {NINGUNO} when it is not about one "
-                           f"project. A project's own page belongs to that project.\nProjects:\n{lista}",
-                           [*(PurePosixPath(r).stem for r in proyectos), NINGUNO], renglones)
+    def con_ficha(r: str) -> bool:
+        return bool(re.search(rf"(?m)^{FICHA}:", (FRONTMATTER.match(notas[r]) or [""])[0]))
+
+    proyectos = [r for r, f in facetas.items() if TIPO_PROYECTO in f.get("tipo", []) and not con_ficha(r)]
+    nombres = [PurePosixPath(r).stem for r in proyectos]
+
+    def lista(elegibles: list[str]) -> str:
+        return "\n".join(f"- {PurePosixPath(r).stem}: {renglon(notas[r], 140)}" for r in proyectos
+                         if PurePosixPath(r).stem in elegibles)
+
+    def usa_ficha(c: str) -> bool:
+        en = [r for r in notas if r not in fuera and _carpeta(r) == c]
+        return bool(en) and sum(map(con_ficha, en)) / len(en) >= PURA
+
+    proyecto: list[str | None] = [None] * len(rutas)
+    libres = [i for i, c in enumerate(carpeta) if not usa_ficha(c)]
+    for i, p in zip(libres, _clasificar(
+            f"{ENTRADA}Pick the project the note belongs to, or {NINGUNO} when it is not about one project. "
+            f"A project's own page belongs to that project.\nProjects:\n{lista(nombres)}",
+            [*nombres, NINGUNO], [renglones[i] for i in libres])):
+        proyecto[i] = p
+    for i in (i for i in range(len(rutas)) if i not in libres):
+        texto = notas[rutas[i]]
+        candidatos = _nombrados(texto, nombres) or nombres
+        proyecto[i] = candidatos[0] if len(candidatos) == 1 else _clasificar(
+            f"{ENTRADA}Pick the project this note feeds into: the one it builds on or names as its related project. "
+            f"Projects named only in a shared opening line about common tools do not count.\n"
+            f"Projects:\n{lista(candidatos)}", candidatos, [renglon(texto, LARGO_FICHA)])[0]
 
     return [PropuestaNota(r, c, t, e, d, None if p == NINGUNO else p, _enlaces(con, corpus, r, notas[r]))
             for r, c, t, e, d, p in zip(rutas, carpeta, tipo, estado, dominio, proyecto)]
+
+
+def _nombrados(texto: str, nombres: list[str]) -> list[str]:
+    """Los proyectos que la nota nombra (`21.Mapo` cuenta como "Mapo"), del más mencionado al menos."""
+    visible = _visible(texto).replace("_", " ").casefold()
+
+    def veces(nombre: str) -> int:
+        corto = re.sub(r"^\d+\.", "", nombre).replace("_", " ").casefold()
+        return len(re.findall(rf"(?<!\w){re.escape(corto)}(?!\w)", visible))
+
+    cuenta = {n: veces(n) for n in nombres}
+    return sorted((n for n in nombres if cuenta[n]), key=cuenta.get, reverse=True)
 
 
 def _enlaces(con: sqlite3.Connection, corpus: Corpus, ruta: str, texto: str) -> tuple[str, ...]:
@@ -232,4 +274,4 @@ def texto_propuestas_nota(propuestas: list[PropuestaNota]) -> str:
     return "\n".join(
         f"{p.ruta}\n  carpeta: {p.carpeta}\n  tipo: {p.tipo}\n  estado: {p.estado}\n  dominio: {p.dominio}"
         f"\n  proyecto: {p.proyecto or '(ninguno)'}\n  enlaces: {', '.join(f'[[{e}]]' for e in p.enlaces) or '(ninguno)'}"
-        f"\n  (tipo y proyecto: baja precisión, revisar)" for p in propuestas)
+        f"\n  (tipo: baja precisión, revisar)" for p in propuestas)

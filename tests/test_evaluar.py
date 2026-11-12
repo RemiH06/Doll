@@ -77,3 +77,12 @@ def test_citar_la_nota_sin_el_dato_no_trae_evidencia(tmp_path):
     g = evaluar_generacion(preguntas, lambda _: next(respuestas), tmp_path / "s.jsonl")
     assert g.todas_las_notas == 3
     assert (g.traen_evidencia, g.con_evidencia, g.sin_evidencia) == (1, 2, ["a"])
+
+
+def test_evaluar_busquedas_cuenta_por_nota_y_el_primer_lugar():
+    from doll.evaluar import evaluar_busquedas
+
+    busquedas = [{"id": "s1", "consulta": "a", "relevantes": ["x", "y"]},
+                 {"id": "s2", "consulta": "b", "relevantes": ["z"]}]
+    orden = {"a": ["q", "x", "w"], "b": ["z"]}
+    assert evaluar_busquedas(busquedas, orden.__getitem__) == (0.75, 1, ["s1"])

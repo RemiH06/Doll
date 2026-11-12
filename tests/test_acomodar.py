@@ -161,6 +161,35 @@ def test_acomodar_nota_pregunta_en_carpetas_mezcladas(taller, monkeypatch):
         acomodar_mod.acomodar_nota(con, corpus, ["insp/2026-01-01-a.md"])
 
 
+def test_acomodar_nota_en_carpeta_con_ficha_lee_todo_y_elige_entre_nombrados(taller, monkeypatch):
+    con, corpus = taller
+    raiz = corpus.ruta / "talleres" / "pedidos"
+    raiz.mkdir()
+    (raiz / "Aguja.md").write_text(_nota("idea", "semilla", "relojería", "# Aguja\n\nX.", 'ficha: "[[Torre]]"\n'), "utf-8")
+    (raiz / "Bisel.md").write_text(_nota("idea", "semilla", "relojería", "# Bisel\n\nY.", 'ficha: "[[Boya]]"\n'), "utf-8")
+    relleno = "Detalle del pedido. " * 60  # más de LARGO: el proyecto viene al final
+    (raiz / "Cuerda.md").write_text(_nota("idea", "semilla", "relojería",
+                                          f"# Cuerda\n\nBase común: Torre.\n\n{relleno}\n\n## Relacionado\n\n[[Boya]], la [[Boya]]."),
+                                    "utf-8")
+    (raiz / "Dial.md").write_text(_nota("idea", "semilla", "relojería", "# Dial\n\nPara la [[Torre]]."), "utf-8")
+    indice.indexar(con, corpus)
+    llamadas = []
+
+    def clasificar(tarea, categorias, renglones):
+        llamadas.append((tarea, categorias, renglones))
+        if "talleres/pedidos/" in categorias:
+            return ["talleres/pedidos/"] * len(renglones)
+        return [categorias[-1]] * len(renglones)
+
+    monkeypatch.setattr(acomodar_mod, "_clasificar", clasificar)
+    cuerda, dial = acomodar_mod.acomodar_nota(con, corpus, ["talleres/pedidos/Cuerda.md", "talleres/pedidos/Dial.md"])
+    # Dial nombra un solo proyecto: sin llamada. Cuerda nombra dos: una llamada sin `ninguno`, con la nota completa.
+    assert dial.proyecto == "Torre" and cuerda.proyecto == "Torre"
+    [(tarea, categorias, [r])] = [x for x in llamadas if "feeds into" in x[0]]
+    assert categorias == ["Boya", "Torre"] and r.endswith("Boya, la Boya.") and len(r) > acomodar_mod.LARGO
+    assert not any("or ninguno" in t for t, _, rs in llamadas if rs)
+
+
 def test_evaluar_acomodar_nota_salta_proyecto_de_fichas(tmp_path):
     etiquetas = [
         {"ruta": "f/Torre.md", "carpeta": "f/", "tipo": "proyecto", "estado": "activo", "dominio": ["a", "b"],

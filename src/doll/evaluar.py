@@ -59,6 +59,20 @@ def evaluar(preguntas: list[dict], motor: Motor, k: int = 5) -> Reporte:
     return Reporte(por_tipo, fallos, sum(chars) / max(len(chars), 1), max(tiempos, default=0.0))
 
 
+def evaluar_busquedas(busquedas: list[dict], motor: Callable[[str], list[str]], n: int = 5) -> tuple[float, int, list[str]]:
+    """Recall@n por nota (relevantes entre las n primeras / mín(relevantes, n)), aciertos@1 y las que no traen todas.
+    `motor` da las rutas de las notas en orden, sin repetir."""
+    recall, aciertos, fallos = 0.0, 0, []
+    for b in busquedas:
+        relevantes, top = set(b["relevantes"]), motor(b["consulta"])[:n]
+        r = len(relevantes.intersection(top)) / min(len(relevantes), n)
+        recall += r
+        aciertos += bool(top) and top[0] in relevantes
+        if r < 1:
+            fallos.append(b["id"])
+    return recall / max(len(busquedas), 1), aciertos, fallos
+
+
 @dataclass
 class ReporteAcomodar:
     clase: int  # la que cuenta para el 80 %
