@@ -67,16 +67,21 @@ def _generacion(args) -> None:
 
 
 def _acomodar(args) -> None:
+    from bakers.core import BakerError
+
     from doll.acomodar import acomodar, acomodar_nota, texto_propuestas, texto_propuestas_nota
 
     corpus = corpus_mod.cargar(args.corpus)
     terceros = {corpus.es_terceros(r) for r in args.rutas}
-    if terceros == {True}:
-        return print(texto_propuestas(acomodar(corpus, args.rutas)))
-    if True in terceros:
+    if True in terceros and False in terceros:
         raise SystemExit("No mezcles notas de inspiración con otras: se acomodan distinto")
-    con, _ = _indice(args.corpus)
-    print(texto_propuestas_nota(acomodar_nota(con, corpus, args.rutas)))
+    try:
+        if True in terceros:
+            return print(texto_propuestas(acomodar(corpus, args.rutas)))
+        con, _ = _indice(args.corpus)
+        print(texto_propuestas_nota(acomodar_nota(con, corpus, args.rutas)))
+    except BakerError as e:
+        raise SystemExit(f"Sin propuesta, el modelo no respondió: {e}") from None
 
 
 def _evaluar_acomodar_boveda(args) -> None:

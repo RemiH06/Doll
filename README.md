@@ -94,10 +94,6 @@ Medido con un modelo local sobre un corpus real de 521 notas; detalle, sets y lo
 - Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
 - `acomodar` acierta la carpeta en 87 % y el proyecto en 88 %, pero `tipo` en 73 %: es una sugerencia que hay que revisar. Ningún set es del todo ciego.
 
-## Future Features
-
-- Confirmar el proyecto que propone `acomodar` con notas que no estuvieron en el ajuste.
-
 ## Autoría
 
 por RemLam ([@RemiH06](https://github.com/RemiH06))

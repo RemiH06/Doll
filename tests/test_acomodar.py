@@ -202,3 +202,21 @@ def test_evaluar_acomodar_nota_salta_proyecto_de_fichas(tmp_path):
     r = evaluar_acomodar_nota(etiquetas, propuestas, tmp_path / "u.jsonl")
     assert r.aciertos == {"carpeta": (1, 2), "tipo": (2, 2), "estado": (1, 2), "dominio": (2, 2), "proyecto": (1, 1)}
     assert r.enlaces == (1, 2, 2) and r.fallos == ["2:carpeta"]
+
+
+def test_cli_sin_gateway_avisa_sin_traceback(boveda, monkeypatch):
+    from argparse import Namespace
+    from dataclasses import replace
+
+    from bakers.core import BakerError
+
+    from doll import cli
+
+    def caido(renglones, tabla):
+        raise BakerError("Falta la variable de entorno BAKERS_URL")
+
+    corpus = replace(boveda, terceros=("insp/**",))
+    monkeypatch.setattr(cli.corpus_mod, "cargar", lambda nombre: corpus)
+    monkeypatch.setattr(acomodar_mod.tabla_clases, "asignar", caido)
+    with pytest.raises(SystemExit, match="Sin propuesta.*BAKERS_URL"):
+        cli._acomodar(Namespace(corpus="t", rutas=["insp/2026-01-01-a.md"]))
