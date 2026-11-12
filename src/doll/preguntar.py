@@ -44,6 +44,7 @@ class Respuesta:
     intentos: int = 0
     fallo: str | None = None
     fragmentos: list[Resultado] = field(default_factory=list)
+    faltan: list[str] = field(default_factory=list)  # nombres de la pregunta ausentes: por qué no se llamó al modelo
 
 
 def _bake(tarea: str, archivo: str) -> dict:
@@ -102,6 +103,8 @@ def texto_fragmentos(fragmentos: list[Resultado], corpus: Corpus) -> str:
 def texto_respuesta(r: Respuesta, corpus: Corpus) -> str:
     if r.fallo:
         return f"Sin respuesta generada: {r.fallo}\nFragmentos recuperados:\n\n{texto_fragmentos(r.fragmentos, corpus)}"
+    if r.faltan:
+        return f"No encontrado: las notas no mencionan {', '.join(r.faltan)}."
     if r.no_encontrado:
         return "No encontrado."
     lineas = [f"{r.texto}\n"]
@@ -163,8 +166,9 @@ def preguntar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int = 5
     tema, solo = corpus.alcance(consulta)
     # `ampliar` solo aquí: `buscar` entrega lo mínimo a quien paga cada carácter de contexto.
     fragmentos = indice.ampliar(con, indice.buscar(con, tema, k, replace(filtro, solo=solo)))
-    if not fragmentos or nombres_faltantes(consulta, fragmentos):
-        r = Respuesta(no_encontrado=True)
+    faltan = sorted(nombres_faltantes(consulta, fragmentos)) if fragmentos else []
+    if not fragmentos or faltan:
+        r = Respuesta(no_encontrado=True, faltan=faltan)
     else:
         try:
             r = _generar(fragmentos, corpus, consulta, baker)

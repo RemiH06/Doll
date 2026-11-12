@@ -6,7 +6,8 @@ import pytest
 
 from doll import indice
 from doll.corpus import Corpus
-from doll.preguntar import AVISO_TERCEROS, BakerCaido, contexto, nombres_faltantes, preguntar, verificar
+from doll.preguntar import (AVISO_TERCEROS, BakerCaido, contexto, nombres_faltantes, preguntar, texto_respuesta,
+                            verificar)
 
 BOVEDA = Path(__file__).parent / "boveda"
 PREGUNTA_SECRETA = "pregunta secreta sobre el escape de áncora"
@@ -76,7 +77,9 @@ def test_sin_citas_no_cuenta_como_respuesta(con, corpus):
 
 def test_el_modelo_puede_decir_no_encontrado(con, corpus):
     baker = guion(salida(no_encontrado=True, respuesta=""))
-    assert preguntar(con, corpus, "escape", baker=baker).no_encontrado and len(baker.llamadas) == 1
+    r = preguntar(con, corpus, "escape", baker=baker)
+    assert r.no_encontrado and len(baker.llamadas) == 1
+    assert r.faltan == [] and texto_respuesta(r, corpus) == "No encontrado."
 
 
 def test_sin_fragmentos_no_llama_al_baker(con, corpus):
@@ -150,7 +153,9 @@ def test_nombre_ausente_no_llama_al_modelo(con, corpus):
     def baker(tarea, archivo):
         raise AssertionError("no debía llamarse")
 
-    assert preguntar(con, corpus, "¿Qué dijo Zacarías sobre el escape de áncora?", baker=baker).no_encontrado
+    r = preguntar(con, corpus, "¿Qué dijo Zacarías sobre el escape de áncora?", baker=baker)
+    assert r.no_encontrado and r.faltan == ["Zacarías"]
+    assert texto_respuesta(r, corpus) == "No encontrado: las notas no mencionan Zacarías."
 
 
 def test_nombres_faltantes_ignora_inicio_de_frase_y_acentos():
