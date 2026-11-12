@@ -10,7 +10,7 @@
 ██████╔╝╚██████╔╝███████╗███████╗
 ╚═════╝  ╚═════╝ ╚══════╝╚══════╝
 
-       by RemLam (@RemiH06)          version 0.2.0
+       by RemLam (@RemiH06)          version 0.3.0
 ```
 
 ![AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge)
@@ -36,6 +36,18 @@ cd Doll
 uv sync
 uv run pytest
 ```
+
+En una máquina sin Rust, compila `doll-parser` donde sí lo haya y lleva el wheel:
+
+```bash
+uv build --wheel parser -o dist                       # en la máquina con Rust
+uv venv                                               # en la otra, dentro del clon
+uv pip install dist/doll_parser-*.whl
+uv pip install -e /ruta/a/Bakery/bakers               # o el paquete bakers desde git
+uv pip install -e . --no-sources
+```
+
+Ahí no corras `uv sync` ni `uv pip install` sin `--no-sources`: los dos leen `[tool.uv.sources]`, compilan `doll-parser` y cambian `bakers` por el de git. Para actualizar, `git pull` basta mientras no cambie `parser/`, porque `doll` queda editable; `uv pip install -e . --no-sources` refresca la versión instalada. Si cambia `parser/`, vuelve a compilar y a instalar el wheel con `--reinstall`.
 
 Crea `~/.doll/corpus.toml`, con rutas relativas a `ruta`:
 
@@ -65,6 +77,14 @@ mcp_excluir = ["borradores/**"]
 ```bash
 uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 ```
+
+Para usarlo desde Claude Code:
+
+```bash
+claude mcp add --scope user doll -- uv run --no-sync --project /ruta/a/Doll doll mcp
+```
+
+`--no-sync` evita que `uv` intente reinstalar `doll.exe` al arrancar: en Windows falla si otra sesión tiene el servidor abierto. Después de un `uv sync`, reinicia las sesiones que usan el MCP.
 
 ## Features
 
