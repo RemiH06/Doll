@@ -18,3 +18,7 @@ eval/
 
 # Rust
 parser/target/
+
+# Resultados sueltos de experimentos: van en ~/.doll/eval/
+/*.json
+/*.jsonl
