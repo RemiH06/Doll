@@ -54,9 +54,38 @@ def _generacion(args) -> None:
 
 
 def _acomodar(args) -> None:
-    from doll.acomodar import acomodar, texto_propuestas
+    from doll.acomodar import acomodar, acomodar_nota, texto_propuestas, texto_propuestas_nota
 
-    print(texto_propuestas(acomodar(corpus_mod.cargar(args.corpus), args.rutas)))
+    corpus = corpus_mod.cargar(args.corpus)
+    terceros = {corpus.es_terceros(r) for r in args.rutas}
+    if terceros == {True}:
+        return print(texto_propuestas(acomodar(corpus, args.rutas)))
+    if True in terceros:
+        raise SystemExit("No mezcles notas de inspiración con otras: se acomodan distinto")
+    con, _ = _indice(args.corpus)
+    print(texto_propuestas_nota(acomodar_nota(con, corpus, args.rutas)))
+
+
+def _evaluar_acomodar_boveda(args) -> None:
+    import tomllib
+
+    from doll.acomodar import acomodar_nota
+
+    corpus = corpus_mod.cargar(args.corpus)
+    con, _ = _indice(args.corpus)
+    eval_dir = corpus_mod.home() / "eval"
+    etiquetas = tomllib.loads((eval_dir / "acomodar-boveda.toml").read_text(encoding="utf-8"))["notas"]
+    # Dos mitades: cada una se acomoda sin estar en los ejemplos, y la otra mitad sí cuenta como bóveda.
+    propuestas = {}
+    for mitad in (etiquetas[0::2], etiquetas[1::2]):
+        propuestas |= {p.ruta: p for p in acomodar_nota(con, corpus, [e["ruta"] for e in mitad])}
+    r = evaluar_mod.evaluar_acomodar_nota(etiquetas, [propuestas[e["ruta"]] for e in etiquetas],
+                                          eval_dir / "ultima-acomodar-boveda.jsonl")
+    for faceta, (a, t) in r.aciertos.items():
+        print(f"{faceta}: {a}/{t} ({a / t:.0%})")
+    tp, propuestos, etiquetados = r.enlaces
+    print(f"enlaces: precisión {tp / max(propuestos, 1):.2f}, recall {tp / max(etiquetados, 1):.2f}")
+    print(f"fallos: {' '.join(r.fallos) or 'ninguno'}")
 
 
 def _evaluar_acomodar(args) -> None:
@@ -84,6 +113,8 @@ def _mcp(args) -> None:
 def _evaluar(args) -> None:
     if args.set == "acomodar":
         return _evaluar_acomodar(args)
+    if args.set == "acomodar-boveda":
+        return _evaluar_acomodar_boveda(args)
     if args.generacion:
         return _generacion(args)
     corpus = corpus_mod.cargar(args.corpus)
@@ -130,13 +161,14 @@ def main() -> None:
 
     ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/<set>.toml")
     ev.add_argument("--motor", default="fts", choices=["grep", "fts"])
-    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs", "acomodar"])
+    ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs", "acomodar",
+                                                 "acomodar-boveda"])
     ev.add_argument("--generacion", action="store_true", help="mide respuestas y citas con el Baker")
     ev.add_argument("-k", type=int, default=5)
     ev.set_defaults(func=_evaluar)
 
-    ac = subs.add_parser("acomodar", help="propone clase y enlaces de notas de inspiración; no escribe")
-    ac.add_argument("rutas", nargs="+", help="relativas a la bóveda, todas en la carpeta de la tabla de clases")
+    ac = subs.add_parser("acomodar", help="propone dónde va cada nota (clase si es de inspiración); no escribe")
+    ac.add_argument("rutas", nargs="+", help="relativas a la bóveda; las de inspiración, en la carpeta de su tabla de clases")
     ac.set_defaults(func=_acomodar)
 
     mc = subs.add_parser("mcp", help="servidor MCP por stdio")

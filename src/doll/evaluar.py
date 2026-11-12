@@ -6,7 +6,7 @@ import time
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 Motor = Callable[[str, int], list[tuple[str, int]]]
 
@@ -90,6 +90,42 @@ def evaluar_acomodar(etiquetas: list[dict], propuestas: list, notas: dict[str, s
                                 "enlaces_esperados": e.get("enlaces", []), "enlaces": list(p.enlaces)},
                                ensure_ascii=False) + "\n")
     return ReporteAcomodar(clase, enlaces, previa, len(etiquetas), fallos)
+
+
+@dataclass
+class ReporteAcomodarNota:
+    aciertos: dict[str, tuple[int, int]]  # faceta -> (aciertos, total)
+    enlaces: tuple[int, int, int]  # propuestos que están en la etiqueta, propuestos, etiquetados
+    fallos: list[str]
+
+
+def evaluar_acomodar_nota(etiquetas: list[dict], propuestas: list, salida: Path) -> ReporteAcomodarNota:
+    """Carpeta y `tipo` cuentan en todas; proyecto solo donde la nota no es su propia ficha (ahí el título lo dice).
+    Una lista de proyectos son equivalentes; vacía es ninguno. El dominio propuesto debe estar en la lista."""
+    cuenta: dict[str, list[int]] = {f: [0, 0] for f in ("carpeta", "tipo", "estado", "dominio", "proyecto")}
+    tp = propuestos = etiquetados = 0
+    fallos = []
+    with salida.open("w", encoding="utf-8") as f:
+        for n, (e, p) in enumerate(zip(etiquetas, propuestas, strict=True), 1):
+            ficha = PurePosixPath(e["ruta"]).stem in e["proyecto"]
+            esperado = {"carpeta": {e["carpeta"]}, "tipo": {e["tipo"]}, "estado": {e["estado"]},
+                        "dominio": set(e["dominio"]), "proyecto": set(e["proyecto"]) or {None}}
+            for faceta, validos in esperado.items():
+                if faceta == "proyecto" and ficha:
+                    continue
+                acierto = getattr(p, faceta) in validos
+                cuenta[faceta][0] += acierto
+                cuenta[faceta][1] += 1
+                if not acierto and faceta in ("carpeta", "tipo", "proyecto"):
+                    fallos.append(f"{n}:{faceta}")
+            tp += len(set(p.enlaces) & set(e["enlaces"]))
+            propuestos += len(p.enlaces)
+            etiquetados += len(e["enlaces"])
+            f.write(json.dumps({"n": n, "ruta": e["ruta"], "esperada": {k: e[k] for k in esperado},
+                                "propuesta": {k: getattr(p, k) for k in esperado},
+                                "enlaces_esperados": e["enlaces"], "enlaces": list(p.enlaces)},
+                               ensure_ascii=False) + "\n")
+    return ReporteAcomodarNota({k: (a, t) for k, (a, t) in cuenta.items()}, (tp, propuestos, etiquetados), fallos)
 
 
 @dataclass
