@@ -21,7 +21,7 @@
 
 El código es público y los datos no: los índices, la configuración de cada corpus y las preguntas de evaluación viven en `~/.doll/`. Los ejemplos y las pruebas usan solo la bóveda ficticia de `tests/boveda/`.
 
-Más detalle en [`docs/`](docs/): [arquitectura](docs/arquitectura.md), [configuración](docs/configuracion.md) y [evaluación](docs/evaluacion.md). Para que un agente use Doll hay dos skills de ejemplo en [`skills/`](skills/).
+Documentación completa: [remih06.github.io/Doll](https://remih06.github.io/Doll/). Para que un agente use Doll hay dos skills de ejemplo en [`skills/`](skills/).
 
 ```diff
 - En desarrollo: funciona en la CLI; la interfaz puede cambiar.
@@ -29,7 +29,7 @@ Más detalle en [`docs/`](docs/): [arquitectura](docs/arquitectura.md), [configu
 
 ## Instalación
 
-1. Instala [uv](https://docs.astral.sh/uv/) y [Rust](https://rustup.rs/): `uv sync` compila `doll-parser` con `cargo`. Sin Rust, ver [Instalar sin Rust](docs/configuracion.md#instalar-sin-rust).
+1. Instala [uv](https://docs.astral.sh/uv/) y [Rust](https://rustup.rs/): `uv sync` compila `doll-parser` con `cargo`. Sin Rust, ver [Instalar sin Rust](https://remih06.github.io/Doll/#sin-rust).
 2. Clona el repo y sincroniza el entorno:
 
 ```bash
@@ -39,7 +39,7 @@ uv sync
 uv run pytest
 ```
 
-3. Crea `~/.doll/corpus.toml` con la carpeta de tus notas (todas las claves en [configuración](docs/configuracion.md#corpus)):
+3. Crea `~/.doll/corpus.toml` con la carpeta de tus notas (todas las claves en [configuración](https://remih06.github.io/Doll/#configuracion)):
 
 ```toml
 [boveda]
@@ -62,8 +62,8 @@ uv run doll buscar "escape de áncora"
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D] [--sentido]`: fragmentos con ruta y líneas. Con `--sentido`, busca por sentido y solo en notas de terceros.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll acomodar RUTA...`: propone dónde va cada nota; no escribe nada.
-- `doll mcp`: servidor MCP por stdio, con las herramientas `buscar`, `buscar_inspiracion` y `preguntar_notas`. Cómo registrarlo en Claude Code: [MCP](docs/configuracion.md#mcp).
-- `doll evaluar [--motor fts|grep] [--generacion] [--set NOMBRE] [-k N]`: mide contra `~/.doll/eval/<set>.toml` (ver [evaluación](docs/evaluacion.md)).
+- `doll mcp`: servidor MCP por stdio, con las herramientas `buscar`, `buscar_inspiracion` y `preguntar_notas`. Cómo registrarlo en Claude Code: [MCP](https://remih06.github.io/Doll/#mcp).
+- `doll evaluar [--motor fts|grep] [--generacion] [--set NOMBRE] [-k N]`: mide contra `~/.doll/eval/<set>.toml` (ver [evaluación](https://remih06.github.io/Doll/#evaluacion)).
 - `--corpus NOMBRE`, antes del comando: elige el corpus; por defecto, `boveda`.
 
 ```bash
@@ -73,7 +73,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 ## Features
 
 - Fragmentos por encabezado, con ruta, líneas y hash por nota, partidos por `doll-parser`, un filtro en Rust.
-- Búsqueda FTS5 que ignora acentos, sin servicios externos, con tope de fragmentos por nota y expansión a las notas enlazadas con `[[wikilinks]]`.
+- Búsqueda FTS5 que ignora acentos, sin servicios externos, con tope de fragmentos por nota, a lo más 2 lugares para notas de terceros y expansión a las notas enlazadas con `[[wikilinks]]`.
 - Búsqueda por sentido en las notas de terceros, con vectores de bge-m3 que calcula Bakery en CPU.
 - Filtro por `tipo` y `dominio` del frontmatter, y alcance por carpeta según frases configurables.
 - Citas comprobadas contra el texto recuperado; si ninguna sobrevive, o si la pregunta nombra algo que no se recuperó, responde "no encontrado".
@@ -86,7 +86,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 
 ## Limitaciones
 
-Medido con un modelo local sobre un corpus real de 521 notas; detalle, sets y lo que se probó y se descartó en [evaluación](docs/evaluacion.md).
+Medido con un modelo local sobre un corpus real de 521 notas; detalle, sets y lo que se probó y se descartó en [evaluación](https://remih06.github.io/Doll/#evaluacion).
 
 - `preguntar` citó todas sus notas en 19 de 22 preguntas de un set nuevo, y en los sets de ajuste baja a cerca del 75 %. Una cita verificada prueba que el texto existe, no que responda la pregunta.
 - Rechazó las 11 preguntas sin respuesta de ese set, pero en otras pruebas limpias solo 5 de 7.

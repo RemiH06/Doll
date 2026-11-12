@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<!--
+Doll · https://github.com/RemiH06/Doll · AGPL-3.0
+Piel derivada de forge (iroFactory, https://github.com/RemiH06/iroFactory, MIT) con los rosas del panel de Bakery.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doll · RAG local para notas Markdown</title>
+<meta name="description" content="Doll busca en tus notas Markdown sin leerlas completas, responde con un modelo local y verifica por código que cada cita exista en el texto recuperado. Sin APIs externas.">
+<link rel="canonical" href="https://remih06.github.io/Doll/">
+<meta property="og:title" content="Doll · RAG local para notas Markdown">
+<meta property="og:description" content="Búsqueda, respuestas con citas verificadas por código y propuestas de dónde acomodar cada nota. Sin APIs externas.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://remih06.github.io/Doll/">
+<meta name="theme-color" content="#140A0E">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=fraunces:600,600i|inter:400,600|azeret-mono:400,500&display=swap" rel="stylesheet">
+<style>
+/* Tokens del panel de Bakery (forge en rosa). Tintas de texto con AA (4.5:1) sobre --bg, --hoja y --papel. */
+:root {
+  --bg: #140A0E; --bg2: #1C1016; --hoja: #26151D; --papel: #301B25; --borde: #48293A; --borde2: #6A4152;
+  --texto: #F6DDE5; --tenue: #C79DAC; --acento: #F27BA6; --acento2: #F8B79A; --hilo: #DB357B; --mono-ok: #8DBF4A;
+  --serif: "Fraunces", Georgia, serif; --sans: "Inter", system-ui, sans-serif; --mono: "Azeret Mono", ui-monospace, monospace;
+  --radio: 4px; --gutter: clamp(16px, 4vw, 40px);
+  --sale: cubic-bezier(.22, 1, .36, 1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body { background: var(--bg); color: var(--texto); font: 16px/1.7 var(--sans); overflow-x: hidden; }
+body::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 90% 55% at 50% 118%, color-mix(in srgb, var(--hilo) 20%, transparent), transparent 70%),
+              linear-gradient(to bottom, #0E070A, var(--bg) 45%, var(--bg2)); }
+main, header, footer { position: relative; z-index: 1; }
+a { color: var(--acento); text-underline-offset: 3px; }
+a:hover { color: var(--acento2); }
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: 2px; }
+.envoltura { width: min(960px, calc(100% - 2 * var(--gutter))); margin-inline: auto; }
+code, pre, kbd { font-family: var(--mono); font-size: .88em; }
+:not(pre) > code { background: var(--hoja); border: 1px solid var(--borde); border-radius: 3px; padding: .05em .35em; overflow-wrap: anywhere; }
+
+/* ── Barra ── */
+.barra { position: fixed; top: 0; left: 0; right: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--borde); }
+.barra .envoltura { display: flex; align-items: center; gap: 20px; min-height: 60px; }
+.marca { display: flex; align-items: center; gap: 10px; color: var(--texto); text-decoration: none; font: italic 600 1.35rem var(--serif); flex: none; }
+.marca svg { width: 30px; height: 30px; }
+.barra nav { overflow-x: auto; scrollbar-width: none; margin-left: auto; }
+.barra nav::-webkit-scrollbar { display: none; }
+.barra ul { display: flex; gap: 4px; list-style: none; white-space: nowrap; }
+.barra nav a { display: block; padding: 8px 10px; color: var(--tenue); text-decoration: none; font-size: .9rem; border-radius: var(--radio); }
+.barra nav a:hover, .barra nav a[aria-current="true"] { color: var(--texto); background: var(--hoja); }
+
+/* ── Portada ── */
+.portada { padding: 132px 0 72px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 40px; align-items: center; }
+.portada h1 { font: italic 600 clamp(3.6rem, 11vw, 6.4rem)/1 var(--serif); letter-spacing: -.02em; }
+.portada .bajada { font: 600 clamp(1.15rem, 2.6vw, 1.45rem)/1.4 var(--serif); margin: 18px 0 14px; }
+.portada p { color: var(--tenue); max-width: 46ch; }
+.acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.boton { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: var(--radio); font-weight: 600; text-decoration: none;
+  border: 1px solid var(--acento); color: var(--bg); background: var(--acento); transition: background-color .2s, color .2s, transform .15s var(--sale); }
+.boton:hover { background: var(--acento2); border-color: var(--acento2); color: var(--bg); }
+.boton:active { transform: translateY(1px); }
+.boton.hueco { background: transparent; color: var(--acento); }
+.boton.hueco:hover { background: var(--hoja); color: var(--texto); }
+.muneca { justify-self: center; width: min(300px, 70vw); }
+.muneca svg { width: 100%; height: auto; overflow: visible; }
+
+/* ── Secciones ── */
+section { padding: 56px 0; }
+h2 { font: 600 clamp(1.7rem, 4.4vw, 2.3rem)/1.2 var(--serif); margin-bottom: 26px; position: relative; padding-bottom: 14px; }
+/* La costura: puntadas bajo cada título que se cosen al entrar la sección. */
+h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: min(220px, 60%); height: 2px;
+  background: repeating-linear-gradient(90deg, var(--hilo) 0 9px, transparent 9px 15px); transform-origin: left; }
+h3 { font: 600 1.15rem/1.3 var(--serif); margin: 30px 0 10px; color: var(--acento2); }
+p + p, p + ul, ul + p, p + pre, pre + p, .tabla + p { margin-top: 14px; }
+ul, ol { padding-left: 1.3em; }
+li + li { margin-top: 6px; }
+.tenue { color: var(--tenue); }
+
+.tarjetas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tarjeta { background: var(--hoja); border: 1px solid var(--borde); border-radius: 6px; padding: 22px; transition: border-color .25s, transform .25s var(--sale); }
+.tarjeta:hover { border-color: var(--borde2); transform: translateY(-2px); }
+.tarjeta h3 { margin-top: 0; }
+.tarjeta .orden { font-family: var(--mono); font-size: .85rem; color: var(--acento); display: block; margin-bottom: 8px; }
+.tarjeta p { color: var(--tenue); font-size: .95rem; }
+.nota { margin-top: 22px; padding: 16px 18px; border-left: 3px dashed var(--hilo); background: var(--bg2); color: var(--tenue); }
+
+/* Código con botón de copiar */
+.codigo { position: relative; margin: 14px 0; }
+pre { background: #0E070A; border: 1px solid var(--borde); border-radius: 6px; padding: 16px 18px; overflow-x: auto; line-height: 1.6; color: var(--texto); }
+pre .c { color: var(--tenue); }
+pre .p { color: var(--acento); user-select: none; }
+.copiar { position: absolute; top: 8px; right: 8px; min-height: 28px; padding: 0 10px; font: 500 .8rem var(--mono); color: var(--tenue);
+  background: var(--hoja); border: 1px solid var(--borde); border-radius: var(--radio); cursor: pointer; }
+.copiar:hover { color: var(--texto); border-color: var(--borde2); }
+
+/* Pasos de instalación */
+.pasos { list-style: none; padding: 0; counter-reset: paso; }
+.pasos > li { counter-increment: paso; position: relative; padding-left: 48px; margin-top: 22px; }
+.pasos > li::before { content: counter(paso); position: absolute; left: 0; top: 0; width: 30px; height: 30px; display: grid; place-items: center;
+  font: 500 .9rem var(--mono); color: var(--acento); border: 1px dashed var(--hilo); border-radius: 50%; }
+
+/* Tablas */
+.tabla { overflow-x: auto; border: 1px solid var(--borde); border-radius: 6px; margin: 14px 0; }
+table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+th { background: var(--hoja); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+.cifra { font-family: var(--mono); color: var(--acento2); white-space: nowrap; }
+
+/* Flujo: la costura que une las piezas. El hilo corre por las puntadas. */
+.flujo { list-style: none; padding: 0; position: relative; margin-top: 8px; }
+.flujo::before { content: ""; position: absolute; left: 15px; top: 14px; bottom: 14px; width: 2px;
+  background: repeating-linear-gradient(180deg, var(--hilo) 0 8px, transparent 8px 14px); background-size: 2px 14px; }
+.flujo > li { position: relative; padding-left: 48px; margin-top: 18px; }
+.flujo > li::before { content: ""; position: absolute; left: 8px; top: 6px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--acento); }
+.flujo > li > strong { font: 600 1.05rem var(--serif); color: var(--texto); }
+.flujo .ramas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+.flujo .rama { background: var(--hoja); border: 1px solid var(--borde); border-radius: 6px; padding: 14px; font-size: .92rem; color: var(--tenue); }
+.flujo .rama b { display: block; color: var(--acento); font: 500 .95rem var(--mono); margin-bottom: 4px; }
+.etiqueta { display: inline-block; font: .78rem var(--mono); color: var(--acento2); border: 1px solid var(--borde2); border-radius: 3px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+
+details { background: var(--bg2); border: 1px solid var(--borde); border-radius: 6px; padding: 0 18px; margin-top: 14px; }
+summary { cursor: pointer; padding: 14px 0; font-weight: 600; min-height: 44px; }
+details[open] { padding-bottom: 16px; }
+
+footer { border-top: 1px solid var(--borde); padding: 28px 0 40px; margin-top: 40px; color: var(--tenue); font-size: .9rem; }
+footer p + p { margin-top: 6px; }
+
+/* ── Movimiento: todo parte visible; el script agrega .anima solo si cargó. ── */
+@media (prefers-reduced-motion: no-preference) {
+  .anima .revela { opacity: 0; transform: translateY(14px); transition: opacity .7s var(--sale), transform .7s var(--sale); }
+  .anima .revela.visto { opacity: 1; transform: none; }
+  .anima h2::after { transform: scaleX(0); transition: transform 1.1s var(--sale) .15s; }
+  .anima .visto h2::after, .anima h2.visto::after { transform: scaleX(1); }
+  .anima .flujo::before { animation: hilo 2.4s linear infinite; }
+  .anima .muneca .mono { transform-origin: 0 0; animation: mece 5s ease-in-out infinite; }
+  .anima .muneca .puntadas { stroke-dashoffset: 0; animation: cose 2.2s var(--sale) both .3s; }
+}
+@keyframes hilo { to { background-position: 0 14px; } }
+@keyframes mece { 0%, 100% { transform: translate(20px, 15px) rotate(-26deg) scale(1.45); }
+                  50% { transform: translate(20px, 15px) rotate(-18deg) scale(1.45); } }
+@keyframes cose { from { stroke-dashoffset: 120; } }
+
+@media (max-width: 760px) {
+  .portada { grid-template-columns: 1fr; padding-top: 112px; gap: 28px; }
+  .muneca { grid-row: 1; width: min(180px, 50vw); justify-self: start; }
+  .tarjetas, .flujo .ramas { grid-template-columns: 1fr; }
+  .barra .envoltura { gap: 12px; }
+  .codigo pre { padding-top: 42px; }
+  .tabla thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tabla table, .tabla tbody, .tabla tr, .tabla td { display: block; }
+  .tabla tr { padding: 12px 14px; border-bottom: 1px solid var(--borde); }
+  .tabla tr:last-child { border-bottom: 0; }
+  .tabla td { padding: 0; border: 0; white-space: normal; }
+  .tabla td:first-child { margin-bottom: 6px; font-weight: 600; }
+}
+</style>
+</head>
+<body>
+<header class="barra">
+  <div class="envoltura">
+    <a class="marca" href="#inicio" aria-label="Doll, inicio">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo"/></svg>Doll
+    </a>
+    <nav aria-label="Secciones">
+      <ul>
+        <li><a href="#que-hace">Qué hace</a></li>
+        <li><a href="#instalar">Instalar</a></li>
+        <li><a href="#comandos">Comandos</a></li>
+        <li><a href="#como-funciona">Cómo funciona</a></li>
+        <li><a href="#configuracion">Configuración</a></li>
+        <li><a href="#agentes">Agentes</a></li>
+        <li><a href="#evaluacion">Evaluación</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="logo">
+      <path d="M14 19 H31 A21 21 0 0 1 31 61 H14 Z" fill="#db357b"/>
+      <path d="M20 25 H31 A15 15 0 0 1 31 55 H20 Z" fill="none" stroke="#f7eef2" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3.5 3"/>
+      <circle cx="31" cy="40" r="4.2" fill="#f7eef2"/><circle cx="29.6" cy="38.6" r=".9" fill="#5a1a3a"/><circle cx="32.4" cy="41.4" r=".9" fill="#5a1a3a"/>
+      <g transform="translate(20 15) rotate(-22) scale(1.45)" fill="#bf5581" stroke="#f7eef2" stroke-width="1.2" stroke-linejoin="round">
+        <path d="M-1 1 L-6 11 L-3 10 L-1.5 12.5 Z M1 1 L5 11 L2 10.5 L0.5 12.8 Z"/>
+        <path d="M0 0 C-4 -8 -14 -7 -13 0 C-14 7 -4 8 0 0 Z M0 0 C4 -8 14 -7 13 0 C14 7 4 8 0 0 Z"/>
+        <circle r="3"/>
+      </g>
+    </g>
+  </defs>
+</svg>
+
+<main id="inicio">
+  <div class="envoltura">
+    <div class="portada">
+      <div>
+        <h1>Doll</h1>
+        <p class="bajada">Un RAG local que encuentra lo que ya escribiste.</p>
+        <p>Busca en tus notas Markdown sin leerlas completas, responde con un modelo propio y verifica por código que cada cita exista en el texto recuperado. También propone dónde va una nota nueva, sin escribir en ella. El nombre viene de RAG doll, muñeca de trapo.</p>
+        <div class="acciones">
+          <a class="boton" href="#instalar">Instalar</a>
+          <a class="boton hueco" href="https://github.com/RemiH06/Doll">Código en GitHub</a>
+        </div>
+      </div>
+      <div class="muneca">
+        <svg viewBox="0 0 64 64" role="img" aria-label="Logo de Doll: una D rosa con costura punteada, un botón al centro y un moño inclinado en la esquina">
+          <path d="M14 19 H31 A21 21 0 0 1 31 61 H14 Z" fill="#db357b"/>
+          <path class="puntadas" d="M20 25 H31 A15 15 0 0 1 31 55 H20 Z" fill="none" stroke="#f7eef2" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3.5 3"/>
+          <circle cx="31" cy="40" r="4.2" fill="#f7eef2"/><circle cx="29.6" cy="38.6" r=".9" fill="#5a1a3a"/><circle cx="32.4" cy="41.4" r=".9" fill="#5a1a3a"/>
+          <g class="mono" transform="translate(20 15) rotate(-22) scale(1.45)" fill="#bf5581" stroke="#f7eef2" stroke-width="1.2" stroke-linejoin="round">
+            <path d="M-1 1 L-6 11 L-3 10 L-1.5 12.5 Z M1 1 L5 11 L2 10.5 L0.5 12.8 Z"/>
+            <path d="M0 0 C-4 -8 -14 -7 -13 0 C-14 7 -4 8 0 0 Z M0 0 C4 -8 14 -7 13 0 C14 7 4 8 0 0 Z"/>
+            <circle r="3"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <section id="que-hace" class="revela">
+      <h2>Qué hace</h2>
+      <div class="tarjetas">
+        <article class="tarjeta">
+          <span class="orden">doll buscar</span>
+          <h3>Encuentra</h3>
+          <p>Devuelve los fragmentos que coinciden, con ruta y líneas, sin modelo y sin servicios externos. Con <code>--sentido</code>, busca por significado en las notas de terceros.</p>
+        </article>
+        <article class="tarjeta">
+          <span class="orden">doll preguntar</span>
+          <h3>Responde</h3>
+          <p>Un modelo local contesta con citas. Cada cita se busca en el texto recuperado y la que no aparece se descarta. Si no sobrevive ninguna, dice "no encontrado".</p>
+        </article>
+        <article class="tarjeta">
+          <span class="orden">doll acomodar</span>
+          <h3>Acomoda</h3>
+          <p>Propone carpeta, <code>tipo</code>, <code>estado</code>, dominio, proyecto y enlaces para una nota nueva. Solo propone: lo aplica una persona.</p>
+        </article>
+      </div>
+      <p class="nota">El código es público y los datos no. Los índices, la configuración de cada corpus y las preguntas de evaluación viven en <code>~/.doll/</code>, fuera del repo. El registro guarda tiempos y conteos, nunca preguntas ni fragmentos.</p>
+    </section>
+
+    <section id="instalar" class="revela">
+      <h2>Instalar</h2>
+      <ol class="pasos">
+        <li>Instala <a href="https://docs.astral.sh/uv/">uv</a> y <a href="https://rustup.rs/">Rust</a>: <code>uv sync</code> compila <code>doll-parser</code> con <code>cargo</code>. Sin Rust, ve <a href="#sin-rust">instalar sin Rust</a>.</li>
+        <li>Clona el repo y sincroniza el entorno:
+          <div class="codigo"><pre><code><span class="p">$ </span>git clone https://github.com/RemiH06/Doll.git
+<span class="p">$ </span>cd Doll
+<span class="p">$ </span>uv sync
+<span class="p">$ </span>uv run pytest</code></pre></div></li>
+        <li>Crea <code>~/.doll/corpus.toml</code> con la carpeta de tus notas (todas las claves en <a href="#configuracion">configuración</a>):
+          <div class="codigo"><pre><code>[boveda]
+ruta = "/ruta/a/tus/notas"
+mcp_excluir = []</code></pre></div></li>
+        <li>Indexa y busca:
+          <div class="codigo"><pre><code><span class="p">$ </span>uv run doll indexar
+<span class="p">$ </span>uv run doll buscar "escape de áncora"
+<span class="c">recursos/oficios/Escapes.md:11-14 [Escapes &gt; Escape de áncora]
+Inventado hacia 1657. Es el más común en relojes de torre porque tolera un péndulo largo.</span></code></pre></div></li>
+      </ol>
+      <p><code>preguntar</code>, <code>acomodar</code> y la búsqueda por sentido necesitan el gateway de <a href="https://github.com/RemiH06/Bakery">Bakery</a>. <code>buscar</code> funciona sin él.</p>
+    </section>
+
+    <section id="comandos" class="revela">
+      <h2>Comandos</h2>
+      <div class="tabla"><table>
+        <thead><tr><th scope="col">Comando</th><th scope="col">Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>doll indexar [--sentido]</code></td><td>Sincroniza el índice con las notas y solo reprocesa las que cambiaron. Con <code>--sentido</code>, también embebe los fragmentos de terceros que no tienen vector (la primera vez, unos 0.4 s por fragmento en CPU).</td></tr>
+          <tr><td><code>doll buscar "consulta"</code></td><td>Fragmentos con ruta y líneas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>, <code>--sentido</code>.</td></tr>
+          <tr><td><code>doll preguntar "consulta"</code></td><td>Respuesta con citas verificadas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>.</td></tr>
+          <tr><td><code>doll acomodar RUTA...</code></td><td>Propone dónde va cada nota; no escribe nada.</td></tr>
+          <tr><td><code>doll mcp</code></td><td>Servidor MCP por stdio con <code>buscar</code>, <code>buscar_inspiracion</code> y <code>preguntar_notas</code>.</td></tr>
+          <tr><td><code>doll evaluar</code></td><td>Mide contra <code>~/.doll/eval/&lt;set&gt;.toml</code>. Opciones: <code>--set NOMBRE</code>, <code>--motor fts|grep</code>, <code>--generacion</code>, <code>-k N</code>.</td></tr>
+          <tr><td><code>--corpus NOMBRE</code></td><td>Antes del comando, elige el corpus. Por defecto, <code>boveda</code>.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="como-funciona" class="revela">
+      <h2>Cómo funciona</h2>
+      <p>Doll indexa notas Markdown en SQLite y las consulta de tres maneras. Los modelos viven en Bakery: Doll no carga ninguno.</p>
+      <ol class="flujo">
+        <li><strong>Notas Markdown</strong> <span class="etiqueta">corpus.toml</span><p class="tenue">Las carpetas excluidas no entran. Un enlace a una nota excluida se tapa como <code>[[…]]</code>, también en el texto, para que su nombre no se pueda buscar.</p></li>
+        <li><strong>doll-parser</strong> <span class="etiqueta">Rust</span><p class="tenue">Parte cada nota por encabezado y saca sus enlaces y su frontmatter. Cada fragmento guarda ruta, líneas y texto.</p></li>
+        <li><strong>Índice SQLite</strong> <span class="etiqueta">FTS5 + vectores</span><p class="tenue">FTS5 ignora acentos y pesa más el título (5) y el encabezado (3) que el texto (1). Solo se reprocesan las notas cuyo hash cambió. Los vectores de bge-m3 cubren solo notas de terceros.</p></li>
+        <li><strong>Consulta</strong>
+          <div class="ramas">
+            <div class="rama"><b>buscar</b>Hasta 2 fragmentos por nota y 2 lugares para notas de terceros, más hasta 3 notas enlazadas desde la mejor.</div>
+            <div class="rama"><b>preguntar</b>Lo mismo, más el resto de la mejor nota (hasta 4000 caracteres). Si la pregunta nombra algo que no se recuperó, no llama al modelo.</div>
+            <div class="rama"><b>acomodar</b>Todas las notas en una sola llamada, con opciones que salen del índice y de la carpeta.</div>
+          </div></li>
+        <li><strong>Gateway de Bakery</strong> <span class="etiqueta">modelo local</span><p class="tenue">Recibe los fragmentos en un archivo temporal. El texto de terceros va marcado como no confiable: es dato, nunca instrucción.</p></li>
+        <li><strong>Verificar citas</strong><p class="tenue">Cada cita se busca en el fragmento recuperado. Sin gateway, <code>preguntar</code> lo dice y entrega los fragmentos.</p></li>
+      </ol>
+    </section>
+
+    <section id="configuracion" class="revela">
+      <h2>Configuración</h2>
+      <p>Doll lee <code>~/.doll/corpus.toml</code>; con <code>DOLL_HOME</code> se cambia la carpeta. Cada tabla es un corpus, y las rutas son relativas a <code>ruta</code>:</p>
+      <div class="codigo"><pre><code>[boveda]
+ruta = "/ruta/a/tus/notas"
+excluir = ["privado/**"]
+terceros = ["recortes/**"]
+mcp_excluir = ["borradores/**"]
+
+[boveda.alcances]
+'notas? de recortes' = "recortes/**"</code></pre></div>
+      <div class="tabla"><table>
+        <thead><tr><th scope="col">Clave</th><th scope="col">Para qué</th></tr></thead>
+        <tbody>
+          <tr><td><code>ruta</code></td><td>Carpeta con las notas.</td></tr>
+          <tr><td><code>excluir</code></td><td>Notas que no entran al índice. <code>gente/**</code> y <code>life/**</code> quedan fuera siempre.</td></tr>
+          <tr><td><code>terceros</code></td><td>Notas escritas por otros (recortes, reels). Su texto va marcado como no confiable, ocupan a lo más 2 de los primeros lugares y son las únicas que entran a la búsqueda por sentido.</td></tr>
+          <tr><td><code>mcp_excluir</code></td><td>Notas que el MCP no entrega, aunque la CLI sí. Es obligatoria para arrancar el servidor: <code>[]</code> si no quieres ocultar nada.</td></tr>
+          <tr><td><code>alcances</code></td><td>Opcional. Si la pregunta coincide con la regex, <code>preguntar</code> busca solo en esa carpeta y la frase no cuenta como tema.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Bakery</h3>
+      <p><code>preguntar</code>, <code>acomodar</code> y la búsqueda por sentido usan el paquete <code>bakers</code> y el gateway de Bakery, con <code>BAKERS_URL</code> y <code>BAKERS_API_KEY</code>. Sin gateway, <code>buscar --sentido</code> usa FTS5 y lo avisa, <code>preguntar</code> entrega los fragmentos y <code>acomodar</code> termina con un aviso.</p>
+      <h3 id="mcp">MCP</h3>
+      <div class="codigo"><pre><code><span class="p">$ </span>claude mcp add --scope user doll -- uv run --no-sync --project /ruta/a/Doll doll mcp</code></pre></div>
+      <p><code>--no-sync</code> evita que <code>uv</code> intente reinstalar <code>doll.exe</code> al arrancar: en Windows eso falla si otra sesión tiene el servidor abierto. Después de un <code>uv sync</code>, reinicia las sesiones que usan el MCP.</p>
+      <details id="sin-rust">
+        <summary>Instalar sin Rust</summary>
+        <p>Compila <code>doll-parser</code> donde sí haya Rust y lleva el wheel:</p>
+        <div class="codigo"><pre><code><span class="c"># en la máquina con Rust</span>
+uv build --wheel parser -o dist
+<span class="c"># en la otra, dentro del clon</span>
+uv venv
+uv pip install dist/doll_parser-*.whl
+uv pip install -e /ruta/a/Bakery/bakers
+uv pip install -e . --no-sources</code></pre></div>
+        <p>Ahí no corras <code>uv sync</code> ni <code>uv pip install</code> sin <code>--no-sources</code>: los dos leen <code>[tool.uv.sources]</code>, compilan <code>doll-parser</code> y cambian <code>bakers</code> por el de git. Si cambia <code>parser/</code>, vuelve a compilar e instala el wheel con <code>--reinstall</code>.</p>
+      </details>
+    </section>
+
+    <section id="agentes" class="revela">
+      <h2>Agentes</h2>
+      <p>El repo trae dos skills de ejemplo en <a href="https://github.com/RemiH06/Doll/tree/main/skills"><code>skills/</code></a> que le dicen a un agente cuándo usar cada herramienta. En Claude Code se instalan copiando cada carpeta a <code>~/.claude/skills/</code>.</p>
+      <div class="tarjetas">
+        <article class="tarjeta">
+          <span class="orden">doll-notas</span>
+          <h3>Buscar antes de leer</h3>
+          <p>Qué herramienta usar, cómo armar la búsqueda, cómo citar <code>ruta:líneas</code> y qué hacer cuando no hay modelo.</p>
+        </article>
+        <article class="tarjeta">
+          <span class="orden">doll-acomodar</span>
+          <h3>Proponer y confirmar</h3>
+          <p>Todas las notas en una sola llamada, la propuesta campo por campo y solo se aplica lo que la persona confirma.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="evaluacion" class="revela">
+      <h2>Evaluación</h2>
+      <p>Nada entra a Doll sin medirse contra sets de preguntas con la respuesta ya etiquetada. Los sets son privados porque preguntan por notas reales; aquí solo van números agregados, medidos con un modelo local sobre un corpus de 521 notas.</p>
+      <div class="tabla"><table>
+        <thead><tr><th scope="col">Qué</th><th scope="col">Resultado</th></tr></thead>
+        <tbody>
+          <tr><td>Recall@5, 5 sets</td><td><span class="cifra">1.00 · 0.76 · 1.00 · 1.00 · 0.83</span>, con 2 lugares para notas de terceros. Sin ese tope, dos sets bajaban a 0.95 y 0.93.</td></tr>
+          <tr><td><code>preguntar</code>, set nuevo</td><td>Citó todas sus notas en <span class="cifra">19/22</span> preguntas con respuesta; el dato exacto salió en <span class="cifra">17/22</span>. En los sets de ajuste baja a cerca del 75 %.</td></tr>
+          <tr><td>Sin respuesta</td><td>Rechazó <span class="cifra">11/11</span> en el set nuevo; en otras pruebas limpias, <span class="cifra">5/7</span>.</td></tr>
+          <tr><td>Búsqueda por sentido</td><td><span class="cifra">71 %</span> de las notas relevantes entre las 5 primeras, contra <span class="cifra">58 %</span> de FTS5, en 16 búsquedas.</td></tr>
+          <tr><td><code>acomodar</code>, inspiración</td><td>Clase <span class="cifra">29/34</span> (85 %), enlaces <span class="cifra">29/34</span>.</td></tr>
+          <tr><td><code>acomodar</code>, resto</td><td>Carpeta <span class="cifra">26/30</span>, <code>tipo</code> <span class="cifra">22/30</span>, <code>estado</code> <span class="cifra">22/30</span>, dominio <span class="cifra">29/30</span>, proyecto <span class="cifra">15/17</span>. Enlaces: precisión 0.31, recall 0.42.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Limitaciones</h3>
+      <ul>
+        <li>Una cita verificada prueba que el texto existe, no que conteste la pregunta. Si el tema aparece en las notas, puede contestar algo cercano con citas reales.</li>
+        <li>A veces dice "no encontrado" aunque el dato esté en lo recuperado.</li>
+        <li><code>buscar</code> y <code>preguntar</code> buscan por palabras: si la pregunta usa otro vocabulario que la nota, pueden no encontrarla. La búsqueda por sentido solo cubre notas de terceros.</li>
+        <li>El alcance solo actúa con las frases configuradas y por carpeta. El chequeo de nombres solo reconoce palabras con mayúscula.</li>
+        <li>Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.</li>
+        <li>Ningún set es del todo ciego: varios se usaron para ajustar, y las etiquetas de <code>acomodar</code> salen de las propias notas. <code>tipo</code> es una sugerencia que hay que revisar.</li>
+      </ul>
+      <details>
+        <summary>Probado y descartado</summary>
+        <ul>
+          <li><strong>Vectores en toda la bóveda</strong> (bge-m3 con RRF): recuperan paráfrasis, pero hacen perder otras preguntas en 1 o 2 de 5 sets.</li>
+          <li><strong>Dejar fuera las notas de terceros</strong> en lugar del tope: bajan 3 de 5 sets, porque varias preguntas buscan justo un recorte.</li>
+          <li><strong>Lotes chicos en <code>acomodar</code></strong>: con 10, 5 o 1 nota por llamada, <span class="cifra">24/34</span> contra <span class="cifra">29/34</span>.</li>
+          <li><strong>Laya en lugar del clasificador</strong>: <span class="cifra">11/34</span>, unas 5 veces más rápido, pero muy seguro cuando se equivoca.</li>
+          <li><strong>Proponer qué proyecto aprovecha un reel</strong>: <span class="cifra">23/38</span>, igual que tomar el primer destino de su clase sin modelo.</li>
+        </ul>
+      </details>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="envoltura">
+    <p>Doll · © 2026 RemLam (<a href="https://github.com/RemiH06">@RemiH06</a>) · <a href="https://github.com/RemiH06/Doll/blob/main/LICENSE">AGPL-3.0</a></p>
+    <p>Piel derivada de forge, de <a href="https://github.com/RemiH06/iroFactory">iroFactory</a>, en los rosas de Bakery. Fuentes de Bunny Fonts: Fraunces, Inter y Azeret Mono (OFL).</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Copiar: un botón con texto en cada bloque de código.
+  for (const caja of document.querySelectorAll(".codigo")) {
+    const boton = document.createElement("button");
+    boton.className = "copiar"; boton.type = "button"; boton.textContent = "Copiar";
+    boton.addEventListener("click", async () => {
+      const texto = [...caja.querySelector("code").childNodes]
+        .filter(n => !(n.classList && (n.classList.contains("p") || n.classList.contains("c"))))
+        .map(n => n.textContent).join("").replace(/\n{2,}/g, "\n").trim();
+      try { await navigator.clipboard.writeText(texto); boton.textContent = "Copiado"; }
+      catch { boton.textContent = "Sin permiso"; }
+      setTimeout(() => (boton.textContent = "Copiar"), 1600);
+    });
+    caja.append(boton);
+  }
+
+  // Sección actual en la barra.
+  const enlaces = new Map([...document.querySelectorAll(".barra nav a")].map(a => [a.hash.slice(1), a]));
+  const marcar = new IntersectionObserver(entradas => {
+    for (const e of entradas) if (e.isIntersecting) {
+      enlaces.forEach(a => a.removeAttribute("aria-current"));
+      enlaces.get(e.target.id)?.setAttribute("aria-current", "true");
+    }
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll("section[id]").forEach(s => marcar.observe(s));
+
+  // Entradas: solo con el script vivo; sin él la página queda visible.
+  if (!("IntersectionObserver" in window)) return;
+  const ver = new IntersectionObserver(entradas => {
+    for (const e of entradas) if (e.isIntersecting) { e.target.classList.add("visto"); ver.unobserve(e.target); }
+  }, { threshold: .12 });
+  document.querySelectorAll(".revela").forEach(s => ver.observe(s));
+  document.documentElement.classList.add("anima");
+})();
+</script>
+</body>
+</html>

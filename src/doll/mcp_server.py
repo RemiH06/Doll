@@ -23,7 +23,7 @@ def crear(nombre: str) -> MCPServer:
         return con
 
     def filtro(tipo: str | None, dominio: str | None) -> indice.Filtro:
-        return indice.Filtro(tipo, dominio, corpus.mcp_excluir)
+        return indice.Filtro(tipo, dominio, corpus.mcp_excluir, terceros=corpus.terceros)
 
     @mcp.tool(description="""Search the user's personal notes and get matching fragments with path and line numbers.
 Cheaper than reading the vault: use it first when the user asks about something they may have written down.

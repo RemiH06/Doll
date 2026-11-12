@@ -51,6 +51,7 @@ CAMPOS = ("tipo", "estado", "dominio")  # los valores salen de las notas, no del
 ENLACE_OCULTO = "[[…]]"  # sin letras: no debe ser un término buscable
 TOPE_POR_NOTA = 2  # si no, varios fragmentos de una nota llenan el top k
 VECINAS = 3
+TOPE_TERCEROS = 2  # sin tope, reels de un mismo tema llenan el top k: con 2 suben docs y nuevas, ningún set baja
 TOPE_AMPLIAR = 4000  # chars de la mejor nota; más no trajo más evidencia en el set
 
 
@@ -68,6 +69,7 @@ class Filtro:
     dominio: str | None = None
     ocultar: tuple[str, ...] = ()  # patrones de ruta, para lo que no debe salir por el MCP
     solo: tuple[str, ...] = ()  # patrones de ruta; vacío: todas
+    terceros: tuple[str, ...] = ()  # patrones de ruta con TOPE_TERCEROS lugares, salvo que se pida tipo o carpeta
 
     def admite(self, ruta: str) -> bool:
         camino = PurePosixPath(ruta)
@@ -215,10 +217,14 @@ def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filt
     elegidos: list[Resultado] = []
     por_nota: Counter[str] = Counter()
     resto = []
+    tope_terceros = k if filtro.solo or filtro.tipo else TOPE_TERCEROS
+    de_terceros = 0
     for r in candidatos:
-        if len(elegidos) < k and por_nota[r.ruta] < TOPE_POR_NOTA:
+        tercero = any(PurePosixPath(r.ruta).full_match(p) for p in filtro.terceros)
+        if len(elegidos) < k and por_nota[r.ruta] < TOPE_POR_NOTA and not (tercero and de_terceros >= tope_terceros):
             elegidos.append(r)
             por_nota[r.ruta] += 1
+            de_terceros += tercero
         else:
             resto.append(r)
     if not elegidos:

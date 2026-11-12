@@ -14,8 +14,8 @@ def _indice(nombre: str):
     return con, indice.indexar(con, corpus)
 
 
-def _filtro(args) -> Filtro:
-    return Filtro(args.tipo, args.dominio)
+def _filtro(args, corpus) -> Filtro:
+    return Filtro(args.tipo, args.dominio, terceros=corpus.terceros)
 
 
 def _indexar(args) -> None:
@@ -31,7 +31,7 @@ def _buscar(args) -> None:
     corpus = corpus_mod.cargar(args.corpus)
     con, _ = _indice(args.corpus)
     if not args.sentido:
-        return print(texto_fragmentos(indice.buscar(con, args.consulta, args.k, _filtro(args)), corpus))
+        return print(texto_fragmentos(indice.buscar(con, args.consulta, args.k, _filtro(args, corpus)), corpus))
     if args.tipo or args.dominio:
         raise SystemExit("--sentido busca solo en notas de terceros: no filtra por --tipo ni --dominio")
     from doll import sentido
@@ -45,7 +45,7 @@ def _buscar(args) -> None:
 def _preguntar(args) -> None:
     corpus = corpus_mod.cargar(args.corpus)
     con, _ = _indice(args.corpus)
-    print(texto_respuesta(preguntar(con, corpus, args.consulta, args.k, filtro=_filtro(args)), corpus))
+    print(texto_respuesta(preguntar(con, corpus, args.consulta, args.k, filtro=_filtro(args, corpus)), corpus))
 
 
 def _generacion(args) -> None:
@@ -54,7 +54,7 @@ def _generacion(args) -> None:
     eval_dir = corpus_mod.home() / "eval"
     g = evaluar_mod.evaluar_generacion(
         evaluar_mod.cargar_preguntas(eval_dir / f"{args.set}.toml"),
-        lambda consulta: preguntar(con, corpus, consulta, args.k),
+        lambda consulta: preguntar(con, corpus, consulta, args.k, filtro=Filtro(terceros=corpus.terceros)),
         eval_dir / f"ultima-{args.set}.jsonl",
     )
     print(f"con citas reales: {g.con_citas}/{g.respondibles}")
@@ -166,7 +166,7 @@ def _evaluar(args) -> None:
     con, _ = _indice(args.corpus)
 
     def fts(consulta: str, k: int) -> list[tuple[str, int]]:
-        return [(r.ruta, len(r.texto)) for r in indice.buscar(con, consulta, k)]
+        return [(r.ruta, len(r.texto)) for r in indice.buscar(con, consulta, k, Filtro(terceros=corpus.terceros))]
 
     motores = {"grep": lambda c, k: grep.buscar(c, notas, k), "fts": fts}
     archivo = corpus_mod.home() / "eval" / f"{args.set}.toml"

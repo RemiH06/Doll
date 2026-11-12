@@ -256,3 +256,19 @@ def test_ampliar_respeta_el_tope(tmp_path, con):
 
 def test_ampliar_sin_fragmentos(con):
     assert indice.ampliar(con, []) == []
+
+
+def test_terceros_ocupan_a_lo_mas_dos_lugares_salvo_que_se_pidan(tmp_path):
+    raiz = tmp_path / "b"
+    (raiz / "reels").mkdir(parents=True)
+    for i in range(4):
+        (raiz / "reels" / f"r{i}.md").write_text(f"# Campana {i}\n\nAfinar la campana con torno.\n", "utf-8")
+    (raiz / "Campanario.md").write_text("# Campanario\n\nLa campana mayor se afina cada año.\n", "utf-8")
+    corpus = Corpus("t", raiz, terceros=("reels/**",))
+    con = indice.abrir(tmp_path / "t.db")
+    indice.indexar(con, corpus)
+    con_tope = indice.buscar(con, "campana", 5, indice.Filtro(terceros=corpus.terceros))
+    assert sum(r.ruta.startswith("reels/") for r in con_tope) == 2
+    assert "Campanario.md" in {r.ruta for r in con_tope}
+    pedidas = indice.buscar(con, "campana", 5, indice.Filtro(solo=corpus.terceros, terceros=corpus.terceros))
+    assert len(pedidas) == 4
