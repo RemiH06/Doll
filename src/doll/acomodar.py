@@ -8,7 +8,7 @@ los del destino de la clase en la tabla de clases.
 Las demás (`acomodar_nota`): carpeta, `tipo`, `estado`, dominio principal, proyecto y enlaces. El modelo lee de cada
 nota su título y el inicio del cuerpo, sin frontmatter, ruta ni `[[...]]`. Las opciones salen del índice y se
 describen con notas que ya las tienen; las notas que se acomodan no cuentan como ejemplo, porque una nota nueva
-todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 22/30 y proyecto 11/17 quedan bajo el 80 %.
+todavía no está en la bóveda. Iteración 5: carpeta 26/30; `tipo` 22/30 y proyecto 12/17 quedan bajo el 80 %.
 """
 
 import re
