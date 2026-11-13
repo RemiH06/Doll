@@ -63,6 +63,8 @@ uv run doll buscar "escape de áncora"
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll acomodar RUTA...`: propone dónde va cada nota; no escribe nada.
 - `doll montar [NOMBRE]`: monta un floppy para la CLI, el MCP y el panel de Bakery; sin nombre, lista los floppies y marca el montado.
+- `doll exportar [-o ARCHIVO] [--con-eval]`: zip firmado del floppy, sin lo excluido ni lo que oculta `mcp_excluir` (ver [compartir](https://remih06.github.io/Doll/#compartir)).
+- `doll importar ZIP [--nombre N]`: instala un floppy desde un zip; si no lo firmaste tú, entra como de terceros.
 - `doll mcp`: servidor MCP por stdio, con las herramientas `buscar`, `buscar_inspiracion` y `preguntar_notas`. Cada llamada usa el floppy montado en ese momento. Cómo registrarlo en Claude Code: [MCP](https://remih06.github.io/Doll/#mcp).
 - `doll evaluar [--motor fts|grep] [--generacion] [--set NOMBRE] [-k N]`: mide contra `eval/<set>.toml` del floppy (ver [evaluación](https://remih06.github.io/Doll/#evaluacion)).
 - `--floppy NOMBRE`, antes del comando: usa ese floppy y no el montado, solo en ese comando.
@@ -76,6 +78,7 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 - Fragmentos por encabezado, con ruta, líneas y hash por nota, partidos por `doll-parser`, un filtro en Rust.
 - HTML por encabezado, con las líneas del archivo fuente, y PDF por página, citado como `archivo.pdf, p. 12`. Un PDF solo se vuelve a extraer si cambia su tamaño o su fecha.
 - Cada corpus es un floppy, y uno está montado a la vez. Por MCP, cada herramienta puede pedir otro floppy solo para esa llamada.
+- Floppies para compartir: zip firmado con `ssh-keygen`, sin lo excluido y con sus enlaces tapados. Al importar se verifica cada hash y la firma; sin la firma del dueño de la instalación, todo el floppy es de terceros.
 - `tapar` quita del índice frases como un nombre o un número de expediente, sin distinguir mayúsculas, acentos ni separadores.
 - Búsqueda FTS5 que ignora acentos, sin servicios externos, con tope de fragmentos por nota, a lo más 2 lugares para notas de terceros y expansión a las notas enlazadas con `[[wikilinks]]`.
 - Búsqueda por sentido en las notas de terceros, con vectores de bge-m3 que calcula Bakery en CPU.
@@ -97,6 +100,7 @@ Medido con un modelo local sobre un corpus real de 521 notas; detalle, sets y lo
 - `buscar` y `preguntar` buscan por palabras. La búsqueda por sentido (71 % de recall@5 contra 58 % de FTS5) solo cubre notas de terceros.
 - Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
 - En PDF y HTML, la cita cayó en la página o sección del dato en 9 de 10 y en 8 de 11. Una pregunta en español sobre un documento en inglés no siempre trae la sección, y un PDF escaneado no entra.
+- Al exportar se tapan enlaces y rutas con carpeta hacia lo que no sale, pero no el nombre suelto de una nota excluida escrito en otra: hay que revisar el zip antes de compartirlo.
 - `acomodar` acierta la carpeta en 87 % y el proyecto en 88 %, pero `tipo` en 73 %: es una sugerencia que hay que revisar. Ningún set es del todo ciego.
 
 ## Autoría

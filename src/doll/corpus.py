@@ -1,7 +1,8 @@
 """Qué notas pertenecen a un corpus. Toda lectura de la bóveda pasa por aquí.
 
 Cada corpus es un floppy: `~/.doll/floppies/<nombre>/` con `floppy.toml`, `indice.db` y `eval/`. Uno está montado a la
-vez (`~/.doll/montado`), y la CLI, el MCP y el panel usan ese salvo que se pida otro por nombre.
+vez (`~/.doll/montado`), y la CLI, el MCP y el panel usan ese salvo que se pida otro por nombre. Uno propio lee su
+`fuente`; uno importado (`doll importar`) no tiene `fuente` y lee su carpeta `notas/`.
 """
 
 import os
@@ -49,6 +50,8 @@ class Corpus:
     alcances: tuple[tuple[str, str], ...] = ()  # (regex de la pregunta, carpeta a la que se limita)
     incluir: tuple[str, ...] = ("**/*.md",)  # qué archivos de la fuente entran, antes de `excluir`
     tapar: tuple[str, ...] = ()  # frases que no se guardan en el índice (datos personales dentro de un documento)
+    version: int | None = None  # sube en cada exportación; un importado solo se reemplaza por una mayor
+    importado: bool = False  # copia fija de `notas/`: no se acomoda ni se vuelve a exportar
 
     @property
     def carpeta(self) -> Path:
@@ -117,11 +120,15 @@ class Corpus:
         return self.leer()[0]
 
 
-def cargar(nombre: str | None = None) -> Corpus:
-    """El floppy con ese nombre; sin nombre, el montado."""
-    nombre = nombre or montado()
+def nombre_valido(nombre: str) -> str:
     if not re.fullmatch(r"\w[\w.-]*", nombre):  # el nombre arma una ruta: nada de `..` ni diagonales
         raise SystemExit(f"Nombre de floppy inválido: {nombre!r}")
+    return nombre
+
+
+def cargar(nombre: str | None = None) -> Corpus:
+    """El floppy con ese nombre; sin nombre, el montado."""
+    nombre = nombre_valido(nombre or montado())
     archivo = floppies() / nombre / "floppy.toml"
     try:
         datos = tomllib.loads(archivo.read_text(encoding="utf-8"))
@@ -130,11 +137,15 @@ def cargar(nombre: str | None = None) -> Corpus:
         raise SystemExit(f"No existe el floppy {nombre!r}{viejo}") from None
     except tomllib.TOMLDecodeError as e:
         raise SystemExit(f"floppy.toml de {nombre!r} inválido: {e}") from None
-    if "fuente" not in datos:
+    importado = "fuente" not in datos and (archivo.parent / "notas").is_dir()
+    if "fuente" not in datos and not importado:
         raise SystemExit(f"Falta `fuente` en el floppy {nombre!r}")
-    ruta = Path(datos["fuente"])
+    ruta = archivo.parent / "notas" if importado else Path(datos["fuente"])
     if not ruta.is_dir():
         raise SystemExit(f"La fuente del floppy {nombre!r} no existe")
+    version = datos.get("version")
+    if version is not None and (type(version) is not int or version < 1):
+        raise SystemExit(f"`version` en el floppy {nombre!r}: un entero desde 1")
     mcp_excluir = datos.get("mcp_excluir")
     alcances = tuple(datos.get("alcances", {}).items())
     for regex, _ in alcances:
@@ -152,4 +163,4 @@ def cargar(nombre: str | None = None) -> Corpus:
     if any(not isinstance(t, str) or len(t.strip()) < 3 for t in tapar):
         raise SystemExit(f"`tapar` en el floppy {nombre!r}: cada frase, de 3 caracteres o más")
     return Corpus(nombre, ruta, tuple(datos.get("excluir", ())), tuple(datos.get("terceros", ())),
-                  None if mcp_excluir is None else tuple(mcp_excluir), alcances, incluir, tapar)
+                  None if mcp_excluir is None else tuple(mcp_excluir), alcances, incluir, tapar, version, importado)

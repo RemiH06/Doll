@@ -1,5 +1,6 @@
 import argparse
 import sys
+from pathlib import Path
 
 from doll import corpus as corpus_mod
 from doll import evaluar as evaluar_mod
@@ -73,6 +74,8 @@ def _acomodar(args) -> None:
     from doll.acomodar import acomodar, acomodar_nota, texto_propuestas, texto_propuestas_nota
 
     corpus = corpus_mod.cargar(args.floppy)
+    if corpus.importado:
+        raise SystemExit(f"{corpus.nombre!r} es importado: una copia fija no se acomoda")
     terceros = {corpus.es_terceros(r) for r in args.rutas}
     if True in terceros and False in terceros:
         raise SystemExit("No mezcles notas de inspiración con otras: se acomodan distinto")
@@ -151,6 +154,23 @@ def _mcp(args) -> None:
     from doll.mcp_server import crear  # import aquí: la CLI no carga el paquete mcp
 
     crear(args.floppy).run()
+
+
+def _exportar(args) -> None:
+    from doll import floppy
+
+    corpus = corpus_mod.cargar(args.floppy)
+    salida = args.salida or Path(f"{corpus.nombre}-v{corpus.version}.zip")
+    e = floppy.exportar(corpus, salida, args.con_eval)
+    print(f"{salida}: {e.notas} notas, {e.documentos} documentos, {e.vectores} vectores, versión {corpus.version}")
+
+
+def _importar(args) -> None:
+    from doll import floppy
+
+    i = floppy.importar(args.zip, args.nombre)
+    como = "propio" if i.terceros is None else f"de terceros ({i.terceros})"
+    print(f"{i.nombre}: importado como {como}, {i.vectores} vectores reusados. Móntalo con `doll montar {i.nombre}`")
 
 
 def _montar(args) -> None:
@@ -239,6 +259,16 @@ def main() -> None:
     mo = subs.add_parser("montar", help="monta un floppy para la CLI, el MCP y el panel; sin nombre, lista los floppies")
     mo.add_argument("nombre", nargs="?")
     mo.set_defaults(func=_montar)
+
+    ex = subs.add_parser("exportar", help="zip firmado del floppy, sin lo excluido ni lo que oculta mcp_excluir")
+    ex.add_argument("-o", "--salida", type=Path, help="por defecto <floppy>-v<version>.zip aquí")
+    ex.add_argument("--con-eval", action="store_true", help="también las preguntas de eval/")
+    ex.set_defaults(func=_exportar)
+
+    im = subs.add_parser("importar", help="instala un floppy desde un zip; si no lo firmaste tú, entra como de terceros")
+    im.add_argument("zip", type=Path)
+    im.add_argument("--nombre", help="otro nombre para el floppy; por defecto, el del zip")
+    im.set_defaults(func=_importar)
 
     mc = subs.add_parser("mcp", help="servidor MCP por stdio; sin --floppy, sigue al montado en cada llamada")
     mc.set_defaults(func=_mcp)

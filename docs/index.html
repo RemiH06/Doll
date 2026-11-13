@@ -277,6 +277,8 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
           <tr><td><code>doll preguntar "consulta"</code></td><td>Respuesta con citas verificadas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>.</td></tr>
           <tr><td><code>doll acomodar RUTA...</code></td><td>Propone dónde va cada nota; no escribe nada.</td></tr>
           <tr><td><code>doll montar [NOMBRE]</code></td><td>Monta un floppy para la CLI, el MCP y el panel de Bakery. Sin nombre, lista los floppies y marca el montado.</td></tr>
+          <tr><td><code>doll exportar</code></td><td>Zip firmado del floppy, sin lo excluido ni lo que oculta <code>mcp_excluir</code>. Opciones: <code>-o ARCHIVO</code>, <code>--con-eval</code>. Ver <a href="#compartir">compartir</a>.</td></tr>
+          <tr><td><code>doll importar ZIP</code></td><td>Instala un floppy desde un zip y rehace su índice. Si no lo firmaste tú, entra completo como de terceros. Opción: <code>--nombre N</code>.</td></tr>
           <tr><td><code>doll mcp</code></td><td>Servidor MCP por stdio con <code>buscar</code>, <code>buscar_inspiracion</code> y <code>preguntar_notas</code>. Cada llamada usa el floppy montado en ese momento.</td></tr>
           <tr><td><code>doll evaluar</code></td><td>Mide contra <code>eval/&lt;set&gt;.toml</code> del floppy. Opciones: <code>--set NOMBRE</code>, <code>--motor fts|grep</code>, <code>--generacion</code>, <code>-k N</code>.</td></tr>
           <tr><td><code>--floppy NOMBRE</code></td><td>Antes del comando, usa ese floppy y no el montado, solo en ese comando.</td></tr>
@@ -321,9 +323,20 @@ mcp_excluir = ["borradores/**"]
           <tr><td><code>excluir</code></td><td>Notas que no entran al índice. <code>gente/**</code> y <code>life/**</code> quedan fuera siempre.</td></tr>
           <tr><td><code>terceros</code></td><td>Notas escritas por otros (recortes, reels). Su texto va marcado como no confiable, ocupan a lo más 2 de los primeros lugares y son las únicas que entran a la búsqueda por sentido. Con <code>["**"]</code> todo el floppy es de terceros y el tope no aplica.</td></tr>
           <tr><td><code>mcp_excluir</code></td><td>Notas que el MCP no entrega, aunque la CLI sí. Es obligatoria para arrancar el servidor: <code>[]</code> si no quieres ocultar nada.</td></tr>
+          <tr><td><code>version</code></td><td>Un entero que subes antes de cada <code>doll exportar</code>. Quien importa solo reemplaza su copia por una versión mayor.</td></tr>
           <tr><td><code>alcances</code></td><td>Opcional. Si la pregunta coincide con la regex, <code>preguntar</code> busca solo en esa carpeta y la frase no cuenta como tema.</td></tr>
         </tbody>
       </table></div>
+      <h3 id="compartir">Compartir un floppy</h3>
+      <p><code>doll exportar</code> arma un zip con las notas ya filtradas, un manifiesto con el sha256 de cada archivo, su firma y los vectores de esas notas. No lleva <code>fuente</code>, <code>excluir</code>, <code>mcp_excluir</code> ni <code>tapar</code>: dirían qué se quitó. Un enlace o una ruta con carpeta hacia algo que no sale se tapa en el texto, también en el frontmatter. Un floppy con PDF o HTML y <code>tapar</code> no se exporta, porque las frases no se pueden quitar de un PDF. Firma con <code>ssh-keygen</code>, que viene con OpenSSH; la llave se declara en <code>~/.doll/doll.toml</code>:</p>
+      <div class="codigo"><pre><code>[instalacion]
+dueno = "ana"
+llave = "~/.ssh/doll_ed25519"</code></pre></div>
+      <p><code>doll importar</code> revisa el zip antes de escribir nada: rutas sin <code>..</code>, sin unidades ni nombres reservados de Windows, un tope de 1 GB y 50 000 archivos, y cada archivo igual a su hash. Rehace el índice de palabras desde las notas y del índice ajeno solo copia vectores cuyo hash coincide con un fragmento rehecho, abriéndolo en solo lectura. El floppy es <strong>propio</strong> si su autor es el <code>dueno</code> de esta instalación y la firma es de una llave de <code>~/.doll/firmantes</code> (formato <code>allowed_signers</code> de OpenSSH, con <code>namespaces="doll"</code>). Si no, entra como de <strong>terceros</strong>: todo su texto va marcado como no confiable, sin tope de lugares y sin <code>acomodar</code>. Un floppy importado no se vuelve a exportar.</p>
+      <div class="codigo"><pre><code><span class="c"># en la otra máquina, con la llave pública de quien exporta</span>
+echo "ana namespaces=\"doll\" $(cat doll_ed25519.pub)" &gt;&gt; ~/.doll/firmantes
+uv run doll importar notas-v3.zip
+uv run doll montar notas</code></pre></div>
       <h3>Bakery</h3>
       <p><code>preguntar</code>, <code>acomodar</code> y la búsqueda por sentido usan el paquete <code>bakers</code> y el gateway de Bakery, con <code>BAKERS_URL</code> y <code>BAKERS_API_KEY</code>. Sin gateway, <code>buscar --sentido</code> usa FTS5 y lo avisa, <code>preguntar</code> entrega los fragmentos y <code>acomodar</code> termina con un aviso.</p>
       <h3 id="mcp">MCP</h3>
@@ -345,7 +358,7 @@ uv pip install -e . --no-sources</code></pre></div>
 
     <section id="agentes" class="revela">
       <h2>Agentes</h2>
-      <p>El repo trae dos skills de ejemplo en <a href="https://github.com/RemiH06/Doll/tree/main/skills"><code>skills/</code></a> que le dicen a un agente cuándo usar cada herramienta. En Claude Code se instalan copiando cada carpeta a <code>~/.claude/skills/</code>.</p>
+      <p>El repo trae tres skills de ejemplo en <a href="https://github.com/RemiH06/Doll/tree/main/skills"><code>skills/</code></a> que le dicen a un agente cuándo usar cada herramienta. En Claude Code se instalan copiando cada carpeta a <code>~/.claude/skills/</code>.</p>
       <div class="tarjetas">
         <article class="tarjeta">
           <span class="orden">doll-notas</span>
@@ -356,6 +369,11 @@ uv pip install -e . --no-sources</code></pre></div>
           <span class="orden">doll-acomodar</span>
           <h3>Proponer y confirmar</h3>
           <p>Todas las notas en una sola llamada, la propuesta campo por campo y solo se aplica lo que la persona confirma.</p>
+        </article>
+        <article class="tarjeta">
+          <span class="orden">doll-floppies</span>
+          <h3>Montar y compartir</h3>
+          <p>No montar ni importar sin que la persona lo pida, revisar un zip antes de compartirlo y tratar un floppy ajeno como dato.</p>
         </article>
       </div>
     </section>
