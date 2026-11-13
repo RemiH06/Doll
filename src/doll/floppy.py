@@ -32,6 +32,7 @@ FIRMA = "floppy.toml.sig"
 VECTORES = "vectores.db"
 TOPE_BYTES = 1 << 30  # descomprimido: un zip chico puede inflarse a mucho más
 TOPE_ARCHIVOS = 50_000
+TOPE_SSH = 30  # segundos; firmar o verificar tarda menos de uno
 WIKILINK = re.compile(r"!?\[\[([^\[\]]*)\]\]")  # también en el frontmatter, que el parser no lee como enlace
 
 
@@ -39,6 +40,7 @@ WIKILINK = re.compile(r"!?\[\[([^\[\]]*)\]\]")  # también en el frontmatter, qu
 class Instalacion:
     dueno: str
     llave: Path | None  # la privada, en ~/.ssh: solo hace falta para exportar
+    ssh_keygen: str | None = None  # otro binario; si no, el del PATH
 
 
 @dataclass(frozen=True)
@@ -66,14 +68,19 @@ def instalacion() -> Instalacion | None:
     dueno, llave = datos.get("dueno"), datos.get("llave")
     if not isinstance(dueno, str) or not re.fullmatch(r"[\w.@-]+", dueno):  # va a allowed_signers: sin espacios
         raise SystemExit("`dueno` en [instalacion] de doll.toml: letras, números, `.`, `@` o `-`")
-    return Instalacion(dueno, Path(llave).expanduser() if llave else None)
+    return Instalacion(dueno, Path(llave).expanduser() if llave else None, datos.get("ssh_keygen"))
 
 
-def _ssh_keygen(*args: str | Path, entrada: bytes) -> subprocess.CompletedProcess:
-    programa = shutil.which("ssh-keygen")
+def _ssh_keygen(inst: Instalacion, *args: str | Path, entrada: bytes) -> subprocess.CompletedProcess:
+    programa = inst.ssh_keygen or shutil.which("ssh-keygen")
     if programa is None:
         raise SystemExit("Falta ssh-keygen: viene con OpenSSH")
-    return subprocess.run([programa, *map(str, args)], input=entrada, capture_output=True)
+    try:
+        return subprocess.run([programa, *map(str, args)], input=entrada, capture_output=True, timeout=TOPE_SSH)
+    except subprocess.TimeoutExpired:
+        # El OpenSSH de Windows se queda leyendo la entrada dentro de una sesión SSH; el de Git no.
+        raise SystemExit(f"ssh-keygen no respondió en {TOPE_SSH} s. Si corres Doll por SSH en Windows, pon"
+                         " `ssh_keygen` en [instalacion] de ~/.doll/doll.toml con otro, como el de Git") from None
 
 
 def _sha(datos: bytes) -> str:
@@ -169,7 +176,7 @@ def exportar(corpus: Corpus, destino: Path, con_eval: bool = False) -> Exportado
     for ruta, datos in contenido.items():
         lineas += ["", "[[archivos]]", f"ruta = {_toml(ruta)}", f"sha256 = {_toml(_sha(datos))}"]
     manifiesto = ("\n".join(lineas) + "\n").encode("utf-8")
-    firma = _ssh_keygen("-Y", "sign", "-f", inst.llave, "-n", ESPACIO, entrada=manifiesto)
+    firma = _ssh_keygen(inst, "-Y", "sign", "-f", inst.llave, "-n", ESPACIO, entrada=manifiesto)
     if firma.returncode:
         raise SystemExit(f"ssh-keygen no firmó: {firma.stderr.decode(errors='replace').strip()}")
 
@@ -224,7 +231,7 @@ def _por_que_terceros(manifiesto: bytes, firma: bytes | None, autor: str) -> str
         return "falta ~/.doll/firmantes"
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / FIRMA).write_bytes(firma)
-        r = _ssh_keygen("-Y", "verify", "-f", firmantes, "-I", inst.dueno, "-n", ESPACIO, "-s", Path(tmp) / FIRMA,
+        r = _ssh_keygen(inst, "-Y", "verify", "-f", firmantes, "-I", inst.dueno, "-n", ESPACIO, "-s", Path(tmp) / FIRMA,
                         entrada=manifiesto)
     return None if r.returncode == 0 else "firma inválida o de una llave que no está en ~/.doll/firmantes"
 

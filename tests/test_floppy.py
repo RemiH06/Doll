@@ -275,3 +275,23 @@ def test_indice_ajeno_es_dato_de_solo_lectura(origen, tmp_path):
     db.close()
     with pytest.raises(SystemExit, match="tabla"):
         floppy._copiar_vectores(local, c, vista)
+
+
+def test_ssh_keygen_que_no_responde_no_cuelga_y_se_puede_cambiar(origen, tmp_path, monkeypatch):
+    zip_ = exportar(origen, tmp_path / "t.zip")
+    (origen / "doll.toml").write_text(
+        (origen / "doll.toml").read_text(encoding="utf-8") + f'ssh_keygen = "{Path(SSH_KEYGEN).as_posix()}"\n',
+        encoding="utf-8")
+    assert floppy.instalacion().ssh_keygen == Path(SSH_KEYGEN).as_posix()
+    assert floppy.importar(zip_, "copia").terceros is None  # el binario configurado verifica
+
+    real = subprocess.run
+
+    def colgado(args, **kw):
+        if "-Y" not in args:
+            return real(args, **kw)  # el parser también corre como subproceso
+        raise subprocess.TimeoutExpired(args, kw["timeout"])
+
+    monkeypatch.setattr(floppy.subprocess, "run", colgado)
+    with pytest.raises(SystemExit, match="ssh_keygen"):
+        exportar(origen, tmp_path / "t2.zip")
