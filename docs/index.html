@@ -384,7 +384,7 @@ uv pip install -e . --no-sources</code></pre></div>
       <div class="tabla"><table>
         <thead><tr><th scope="col">Qué</th><th scope="col">Resultado</th></tr></thead>
         <tbody>
-          <tr><td>Recall@5, 5 sets</td><td><span class="cifra">1.00 · 0.76 · 1.00 · 1.00 · 0.83</span>, con 2 lugares para notas de terceros. Sin ese tope, dos sets bajaban a 0.95 y 0.93.</td></tr>
+          <tr><td>Recall@5, 5 sets</td><td><span class="cifra">1.00 · 0.76 · 1.00 · 1.00 · 0.75</span>, con 2 lugares para notas de terceros. Sin ese tope, dos sets bajaban a 0.95 y 0.93. El último era 0.83: una pregunta busca una nota por un nombre que <code>tapar</code> oculta, y se aceptó perderla.</td></tr>
           <tr><td><code>preguntar</code>, set nuevo</td><td>Citó todas sus notas en <span class="cifra">19/22</span> preguntas con respuesta; el dato exacto salió en <span class="cifra">17/22</span>. En los sets de ajuste baja a cerca del 75 %.</td></tr>
           <tr><td>Sin respuesta</td><td>Rechazó <span class="cifra">11/11</span> en el set nuevo; en otras pruebas limpias, <span class="cifra">5/7</span>.</td></tr>
           <tr><td>Búsqueda por sentido</td><td><span class="cifra">71 %</span> de las notas relevantes entre las 5 primeras, contra <span class="cifra">58 %</span> de FTS5, en 16 búsquedas.</td></tr>
