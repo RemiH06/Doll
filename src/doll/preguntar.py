@@ -91,12 +91,19 @@ def verificar(citas: list[str], fragmentos: list[Resultado], corpus: Corpus) -> 
     return buenas, malas
 
 
+def ubicacion(ruta: str, linea_ini: int, linea_fin: int) -> str:
+    """Cómo se cita: un PDF por página (su fragmento guarda la página en las líneas); lo demás, por líneas."""
+    if ruta.lower().endswith(".pdf"):
+        return f"{ruta}, p. {linea_ini}"
+    return f"{ruta}:{linea_ini}-{linea_fin}"
+
+
 def texto_fragmentos(fragmentos: list[Resultado], corpus: Corpus) -> str:
     """Lo que ve quien busca, por CLI o MCP: la marca de terceros sale siempre."""
     partes = []
     for f in fragmentos:
         aviso = f" [{AVISO_TERCEROS}]" if corpus.es_terceros(f.ruta) else ""
-        partes.append(f"{f.ruta}:{f.linea_ini}-{f.linea_fin} [{f.encabezado}]{aviso}\n{f.texto}\n")
+        partes.append(f"{ubicacion(f.ruta, f.linea_ini, f.linea_fin)} [{f.encabezado}]{aviso}\n{f.texto}\n")
     return "\n".join(partes)
 
 
@@ -110,7 +117,7 @@ def texto_respuesta(r: Respuesta, corpus: Corpus) -> str:
     lineas = [f"{r.texto}\n"]
     for c in r.citas:
         aviso = f" [{AVISO_TERCEROS}]" if c.terceros else ""
-        lineas.append(f"- {c.ruta}:{c.linea_ini}-{c.linea_fin}{aviso}\n  {c.texto}")
+        lineas.append(f"- {ubicacion(c.ruta, c.linea_ini, c.linea_fin)}{aviso}\n  {c.texto}")
     if r.citas_descartadas:
         lineas.append(f"({r.citas_descartadas} citas descartadas: no aparecen en las notas)")
     return "\n".join(lineas)

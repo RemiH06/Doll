@@ -2,17 +2,20 @@
 
 import hashlib
 import json
+import re
 import sqlite3
 import sys
+import unicodedata
 from collections import Counter
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
+from doll import extraer
 from doll.corpus import Corpus
 from doll.grep import terminos
-from doll.parser import analizar
+from doll.parser import Nota, analizar
 
 # El índice se rehace solo: las notas no cambiaron, pero lo que se guarda de ellas sí.
 VERSION = 2
@@ -49,6 +52,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
 PESOS = (5.0, 3.0, 1.0)  # titulo, encabezado, texto
 CAMPOS = ("tipo", "estado", "dominio")  # los valores salen de las notas, no del código
 ENLACE_OCULTO = "[[…]]"  # sin letras: no debe ser un término buscable
+TEXTO_OCULTO = "[…]"
+VARIANTES = {"a": "aáàäâ", "e": "eéèëê", "i": "iíìïî", "o": "oóòöô", "u": "uúùüû", "n": "nñ"}
 TOPE_POR_NOTA = 2  # si no, varios fragmentos de una nota llenan el top k
 VECINAS = 3
 TOPE_TERCEROS = 2  # sin tope, reels de un mismo tema llenan el top k: con 2 suben docs y nuevas, ningún set baja
@@ -101,6 +106,17 @@ def _tapar(cadena: str, crudos: set[str]) -> str:
     return cadena
 
 
+def _patron_tapar(frases: Iterable[str]) -> re.Pattern | None:
+    """Sin distinguir mayúsculas ni acentos, con espacios o guiones bajos entre palabras: un PDF escribe un mismo
+    nombre de muchas formas. La más larga primero, para que no quede un pedazo."""
+    def palabra(p: str) -> str:
+        sin_acentos = "".join(c for c in unicodedata.normalize("NFKD", p) if not unicodedata.combining(c))
+        return "".join(f"[{VARIANTES[c]}]" if c in VARIANTES else re.escape(c) for c in sin_acentos.casefold())
+
+    alternativas = [r"[\s_]+".join(map(palabra, f.split())) for f in sorted(frases, key=len, reverse=True)]
+    return re.compile("|".join(alternativas), re.IGNORECASE) if alternativas else None
+
+
 def _nombres(rutas: Iterable[str]) -> dict[str, str]:
     """Cada forma de enlazar una nota: nombre, o ruta desde cualquier carpeta. Como en Obsidian, gana la ruta más corta."""
     nombres: dict[str, str] = {}
@@ -120,24 +136,61 @@ def _categorias(frontmatter: dict) -> list[tuple[str, str]]:
     return list(dict.fromkeys(pares))
 
 
-def _firma(notas: dict[str, str], excluidas: list[str]) -> str:
-    """Todo lo que cambia el índice: las notas y qué queda fuera, porque un enlace se tapa según eso."""
-    return hashlib.sha256(json.dumps([notas, excluidas]).encode()).hexdigest()
+def _firma(notas: dict[str, str], sellos: dict[str, str], excluidas: list[str], tapar: tuple[str, ...]) -> str:
+    """Todo lo que cambia el índice: notas, documentos, qué queda fuera (un enlace se tapa según eso) y qué se tapa."""
+    return hashlib.sha256(json.dumps([notas, sellos, excluidas, tapar]).encode()).hexdigest()
+
+
+def _sello(archivo: Path) -> str:
+    # Tamaño y fecha, no contenido: leer cada PDF en cada `buscar` no cabe en 2 s.
+    estado = archivo.stat()
+    return f"{estado.st_size}:{estado.st_mtime_ns}"
+
+
+def _extraer(ruta: str, archivo: Path) -> Nota:
+    try:
+        if archivo.suffix.lower() == ".pdf":
+            return extraer.pdf(archivo)
+        return extraer.html(archivo.read_text(encoding="utf-8", errors="replace"))
+    except Exception as e:  # un PDF cifrado o dañado no debe detener el índice de los demás
+        print(f"Aviso: no se pudo leer {ruta}: {type(e).__name__}", file=sys.stderr)
+        return Nota([], [], {}, False)
+
+
+def _guardar(con: sqlite3.Connection, ruta: str, huella: str, nota: Nota, tapar: set[str],
+             frases: re.Pattern | None) -> None:
+    def limpio(cadena: str) -> str:
+        cadena = _tapar(cadena, tapar)
+        return frases.sub(TEXTO_OCULTO, cadena) if frases else cadena
+
+    _quitar(con, ruta)
+    con.execute("INSERT INTO notas VALUES (?, ?)", (ruta, huella))
+    con.executemany("INSERT INTO categorias VALUES (?, ?, ?)", [(ruta, *par) for par in _categorias(nota.frontmatter)])
+    titulo = limpio(nota.titulo or PurePosixPath(ruta).stem)  # el nombre del archivo también se busca
+    for f in nota.fragmentos:
+        encabezado, cuerpo = limpio(f.encabezado), limpio(f.texto)
+        fila = con.execute(
+            "INSERT INTO fragmentos (ruta, encabezado, linea_ini, linea_fin, texto) VALUES (?, ?, ?, ?, ?)",
+            (ruta, encabezado, f.linea_ini, f.linea_fin, cuerpo),
+        )
+        con.execute("INSERT INTO fts (rowid, titulo, encabezado, texto) VALUES (?, ?, ?, ?)",
+                    (fila.lastrowid, titulo, encabezado, cuerpo))
 
 
 def indexar(con: sqlite3.Connection, corpus: Corpus) -> tuple[int, int]:
     """Sincroniza el índice con el corpus. Devuelve (notas reindexadas, notas quitadas)."""
-    notas = corpus.notas()
-    excluidas = corpus.excluidas()
-    firma = _firma(notas, excluidas)
+    notas, documentos, excluidas = corpus.leer()
+    sellos = {ruta: _sello(archivo) for ruta, archivo in documentos.items()}
+    firma = _firma(notas, sellos, excluidas, corpus.tapar)
     if con.execute("SELECT 1 FROM firma WHERE valor = ?", (firma,)).fetchone():
         return 0, 0  # el camino de cada `buscar`: sin lanzar el parser
 
     previas = dict(con.execute("SELECT ruta, hash FROM notas"))
     # Una nota borrada o recién excluida no puede quedarse en el índice.
-    sobrantes = previas.keys() - notas.keys()
+    sobrantes = previas.keys() - notas.keys() - documentos.keys()
     nombres = _nombres([*notas, *excluidas])
     analizadas = analizar(list(notas.values()))
+    frases = _patron_tapar(corpus.tapar)
     cambiadas = 0
     with con:
         for ruta in sobrantes:
@@ -158,27 +211,21 @@ def indexar(con: sqlite3.Connection, corpus: Corpus) -> tuple[int, int]:
                 elif destino or not corpus.incluida(f"{sin_md}.md"):
                     tapar.add(enlace.crudo)
 
-            # El hash incluye lo tapado: si una nota enlazada sale del corpus, esta debe rehacerse.
-            huella = hashlib.sha256("\0".join([texto, *sorted(tapar)]).encode()).hexdigest()
+            # El hash incluye lo tapado: si una nota enlazada sale del corpus, o cambia `tapar`, esta debe rehacerse.
+            huella = hashlib.sha256("\0".join([texto, *sorted(tapar), *corpus.tapar]).encode()).hexdigest()
             if previas.get(ruta) == huella:
                 continue
             cambiadas += 1
-            _quitar(con, ruta)
-            con.execute("INSERT INTO notas VALUES (?, ?)", (ruta, huella))
-            con.executemany("INSERT INTO categorias VALUES (?, ?, ?)",
-                            [(ruta, *par) for par in _categorias(nota.frontmatter)])
-            titulo = PurePosixPath(ruta).stem
-            for f in nota.fragmentos:
-                encabezado, cuerpo = _tapar(f.encabezado, tapar), _tapar(f.texto, tapar)
-                fila = con.execute(
-                    "INSERT INTO fragmentos (ruta, encabezado, linea_ini, linea_fin, texto)"
-                    " VALUES (?, ?, ?, ?, ?)",
-                    (ruta, encabezado, f.linea_ini, f.linea_fin, cuerpo),
-                )
-                con.execute(
-                    "INSERT INTO fts (rowid, titulo, encabezado, texto) VALUES (?, ?, ?, ?)",
-                    (fila.lastrowid, titulo, encabezado, cuerpo),
-                )
+            _guardar(con, ruta, huella, nota, tapar, frases)
+        for ruta, archivo in documentos.items():
+            huella = hashlib.sha256("\0".join([sellos[ruta], *corpus.tapar]).encode()).hexdigest()
+            if previas.get(ruta) == huella:
+                continue
+            cambiadas += 1
+            nota = _extraer(ruta, archivo)
+            if not nota.fragmentos:
+                print(f"Aviso: sin texto en {ruta} (escaneado o solo imágenes): no entra a la búsqueda", file=sys.stderr)
+            _guardar(con, ruta, huella, nota, set(), frases)
         con.execute("DELETE FROM firma")
         con.execute("INSERT INTO firma VALUES (?)", (firma,))
     return cambiadas, len(sobrantes)
@@ -217,7 +264,8 @@ def buscar(con: sqlite3.Connection, consulta: str, k: int, filtro: Filtro = Filt
     elegidos: list[Resultado] = []
     por_nota: Counter[str] = Counter()
     resto = []
-    tope_terceros = k if filtro.solo or filtro.tipo else TOPE_TERCEROS
+    # Con todo el floppy de terceros (`**`) no hay notas propias que proteger: el tope solo dejaría 2 resultados.
+    tope_terceros = k if filtro.solo or filtro.tipo or "**" in filtro.terceros else TOPE_TERCEROS
     de_terceros = 0
     for r in candidatos:
         tercero = any(PurePosixPath(r.ruta).full_match(p) for p in filtro.terceros)

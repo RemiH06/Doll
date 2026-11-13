@@ -61,6 +61,7 @@ def _generacion(args) -> None:
     print(f"citan todas sus notas: {g.todas_las_notas}/{g.respondibles}")
     print(f"citan alguna nota esperada: {g.alguna_nota}/{g.respondibles}")
     print(f"traen la evidencia: {g.traen_evidencia}/{g.con_evidencia} (sin ella: {' '.join(g.sin_evidencia) or 'ninguna'})")
+    print(f"citan la página o sección de la evidencia: {g.citan_el_lugar}/{g.con_evidencia}")
     print(f"no respondibles detectadas: {g.no_encontrado}/{g.no_respondibles}")
     print(f"segundos promedio: {g.segundos_promedio:.1f}")
     print(f"fallos: {' '.join(g.fallos) or 'ninguno'}")
@@ -176,7 +177,9 @@ def _evaluar(args) -> None:
     if args.generacion:
         return _generacion(args)
     corpus = corpus_mod.cargar(args.floppy)
-    notas = corpus.notas()
+    notas, documentos, _ = corpus.leer()
+    if args.motor == "grep" and documentos:
+        raise SystemExit("grep solo lee Markdown: no sirve de línea base en un floppy con HTML o PDF")
     con, _ = _indice(corpus)
 
     def fts(consulta: str, k: int) -> list[tuple[str, int]]:
@@ -185,7 +188,9 @@ def _evaluar(args) -> None:
     motores = {"grep": lambda c, k: grep.buscar(c, notas, k), "fts": fts}
     archivo = corpus.eval / f"{args.set}.toml"
     reporte = evaluar_mod.evaluar(evaluar_mod.cargar_preguntas(archivo), motores[args.motor], args.k)
-    print(f"motor {args.motor} | {len(notas)} notas | {sum(map(len, notas.values()))} chars")
+    # Del índice, no de la fuente: un PDF sin texto no cuenta, y un documento solo existe ya extraído.
+    archivos, chars = con.execute("SELECT count(DISTINCT ruta), coalesce(sum(length(texto)), 0) FROM fragmentos").fetchone()
+    print(f"motor {args.motor} | {archivos} archivos con texto | {chars} chars")
     print(f"recall@{args.k}: {reporte.recall:.2f}")
     for tipo, (aciertos, total) in reporte.por_tipo.items():
         print(f"  {tipo}: {aciertos}/{total}")

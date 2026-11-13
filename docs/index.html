@@ -286,10 +286,10 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
 
     <section id="como-funciona" class="revela">
       <h2>Cómo funciona</h2>
-      <p>Doll indexa notas Markdown en SQLite y las consulta de tres maneras. Los modelos viven en Bakery: Doll no carga ninguno.</p>
+      <p>Doll indexa notas Markdown, HTML y PDF en SQLite y las consulta de tres maneras. Los modelos viven en Bakery: Doll no carga ninguno.</p>
       <ol class="flujo">
-        <li><strong>Notas Markdown</strong> <span class="etiqueta">floppy.toml</span><p class="tenue">Las carpetas excluidas no entran. Un enlace a una nota excluida se tapa como <code>[[…]]</code>, también en el texto, para que su nombre no se pueda buscar.</p></li>
-        <li><strong>doll-parser</strong> <span class="etiqueta">Rust</span><p class="tenue">Parte cada nota por encabezado y saca sus enlaces y su frontmatter. Cada fragmento guarda ruta, líneas y texto.</p></li>
+        <li><strong>Notas y documentos</strong> <span class="etiqueta">floppy.toml</span><p class="tenue">Las carpetas excluidas no entran. Un enlace a una nota excluida se tapa como <code>[[…]]</code>, también en el texto, para que su nombre no se pueda buscar. Las frases de <code>tapar</code> se guardan como <code>[…]</code>.</p></li>
+        <li><strong>doll-parser y extractores</strong> <span class="etiqueta">Rust + Python</span><p class="tenue">El parser en Rust parte cada nota Markdown por encabezado y saca sus enlaces y su frontmatter. Un HTML se parte por <code>h1</code> a <code>h6</code>, sin scripts, estilos ni menús; un PDF, por página (pypdf), y las páginas sin texto, como los escaneos, no entran. Cada fragmento guarda ruta, líneas (o página) y texto.</p></li>
         <li><strong>Índice SQLite</strong> <span class="etiqueta">FTS5 + vectores</span><p class="tenue">FTS5 ignora acentos y pesa más el título (5) y el encabezado (3) que el texto (1). Solo se reprocesan las notas cuyo hash cambió. Los vectores de bge-m3 cubren solo notas de terceros.</p></li>
         <li><strong>Consulta</strong>
           <div class="ramas">
@@ -316,8 +316,10 @@ mcp_excluir = ["borradores/**"]
         <thead><tr><th scope="col">Clave</th><th scope="col">Para qué</th></tr></thead>
         <tbody>
           <tr><td><code>fuente</code></td><td>Carpeta con las notas. El índice se pone al día solo cuando cambian.</td></tr>
+          <tr><td><code>incluir</code></td><td>Qué archivos de la fuente entran, como patrones: <code>["**/*.md"]</code> si no se dice, y también <code>.html</code> y <code>.pdf</code>. Sin <code>**</code>, como en <code>"*/docs/*.html"</code>, Doll solo abre las carpetas del patrón, y una fuente grande no se recorre en cada búsqueda.</td></tr>
+          <tr><td><code>tapar</code></td><td>Frases que no se guardan en el índice, como un nombre o un número de cuenta dentro de un PDF. No distingue mayúsculas, acentos ni espacios o guiones bajos entre palabras. El nombre del archivo no se tapa: para eso, <code>mcp_excluir</code>.</td></tr>
           <tr><td><code>excluir</code></td><td>Notas que no entran al índice. <code>gente/**</code> y <code>life/**</code> quedan fuera siempre.</td></tr>
-          <tr><td><code>terceros</code></td><td>Notas escritas por otros (recortes, reels). Su texto va marcado como no confiable, ocupan a lo más 2 de los primeros lugares y son las únicas que entran a la búsqueda por sentido.</td></tr>
+          <tr><td><code>terceros</code></td><td>Notas escritas por otros (recortes, reels). Su texto va marcado como no confiable, ocupan a lo más 2 de los primeros lugares y son las únicas que entran a la búsqueda por sentido. Con <code>["**"]</code> todo el floppy es de terceros y el tope no aplica.</td></tr>
           <tr><td><code>mcp_excluir</code></td><td>Notas que el MCP no entrega, aunque la CLI sí. Es obligatoria para arrancar el servidor: <code>[]</code> si no quieres ocultar nada.</td></tr>
           <tr><td><code>alcances</code></td><td>Opcional. Si la pregunta coincide con la regex, <code>preguntar</code> busca solo en esa carpeta y la frase no cuenta como tema.</td></tr>
         </tbody>
@@ -370,12 +372,16 @@ uv pip install -e . --no-sources</code></pre></div>
           <tr><td>Búsqueda por sentido</td><td><span class="cifra">71 %</span> de las notas relevantes entre las 5 primeras, contra <span class="cifra">58 %</span> de FTS5, en 16 búsquedas.</td></tr>
           <tr><td><code>acomodar</code>, inspiración</td><td>Clase <span class="cifra">29/34</span> (85 %), enlaces <span class="cifra">29/34</span>.</td></tr>
           <tr><td><code>acomodar</code>, resto</td><td>Carpeta <span class="cifra">26/30</span>, <code>tipo</code> <span class="cifra">22/30</span>, <code>estado</code> <span class="cifra">22/30</span>, dominio <span class="cifra">29/30</span>, proyecto <span class="cifra">15/17</span>. Enlaces: precisión 0.31, recall 0.42.</td></tr>
+          <tr><td>PDF, material escolar</td><td>359 PDFs: recall@5 <span class="cifra">0.90</span>; la cita cae en la página del dato en <span class="cifra">9/10</span>; sin respuesta, <span class="cifra">5/5</span>. 36 PDFs escaneados no tienen texto.</td></tr>
+          <tr><td>HTML, documentación</td><td>17 páginas: recall@5 <span class="cifra">0.91</span>; la cita cae en la sección del dato en <span class="cifra">8/11</span>; sin respuesta, <span class="cifra">5/5</span>.</td></tr>
         </tbody>
       </table></div>
       <h3>Limitaciones</h3>
       <ul>
         <li>Una cita verificada prueba que el texto existe, no que conteste la pregunta. Si el tema aparece en las notas, puede contestar algo cercano con citas reales.</li>
-        <li>A veces dice "no encontrado" aunque el dato esté en lo recuperado.</li>
+        <li>A veces dice "no encontrado" aunque el dato esté en lo recuperado. Con una premisa falsa ("en qué nube sincroniza", si no sincroniza) dice "no encontrado" en vez de corregirla.</li>
+        <li>Una pregunta en español sobre un documento en inglés encuentra el documento, pero no siempre la sección del dato.</li>
+        <li>Un PDF escaneado no tiene texto: sin OCR, no entra a la búsqueda.</li>
         <li><code>buscar</code> y <code>preguntar</code> buscan por palabras: si la pregunta usa otro vocabulario que la nota, pueden no encontrarla. La búsqueda por sentido solo cubre notas de terceros.</li>
         <li>El alcance solo actúa con las frases configuradas y por carpeta. El chequeo de nombres solo reconoce palabras con mayúscula.</li>
         <li>Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.</li>

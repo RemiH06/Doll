@@ -155,6 +155,7 @@ class ReporteGeneracion:
     traen_evidencia: int = 0  # citar la nota no prueba contestar: el dato etiquetado debe salir
     con_evidencia: int = 0
     sin_evidencia: list[str] = field(default_factory=list)
+    citan_el_lugar: int = 0  # de las que traen evidencia etiquetada: la cita cae en su página o sección
 
 
 def _trae_evidencia(p: dict, r) -> bool:
@@ -162,10 +163,17 @@ def _trae_evidencia(p: dict, r) -> bool:
     return all(_plano(e) in salida for e in p["evidencia"])
 
 
+def _cita_el_lugar(p: dict, r) -> bool:
+    """Cada dato etiquetado está en un fragmento citado: citar el PDF correcto en otra página no cuenta."""
+    citados = {(c.ruta, c.linea_ini) for c in r.citas}
+    textos = [_plano(f.texto) for f in r.fragmentos if (f.ruta, f.linea_ini) in citados]
+    return all(any(_plano(e) in t for t in textos) for e in p["evidencia"])
+
+
 def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path) -> ReporteGeneracion:
     """Corre `responder(pregunta)` y guarda cada respuesta completa para leerla: acertar no prueba no inventar."""
     con_citas = todas_las_notas = alguna_nota = no_encontrado = respondibles = no_respondibles = 0
-    traen = con_evidencia = 0
+    traen = con_evidencia = lugar = 0
     fallos, tiempos, sin_evidencia = [], [], []
     with salida.open("w", encoding="utf-8") as f:
         for p in preguntas:
@@ -190,11 +198,12 @@ def evaluar_generacion(preguntas: list[dict], responder: Callable, salida: Path)
                 con_evidencia += 1
                 trae = _trae_evidencia(p, r)
                 traen += trae
+                lugar += _cita_el_lugar(p, r)
                 if not trae:
                     sin_evidencia.append(p["id"])
             f.write(json.dumps({"id": p["id"], "acierto": acierto, "respuesta": r.texto, "fallo": r.fallo,
                                 "descartadas": r.citas_descartadas, "intentos": r.intentos,
-                                "citas": [(c.ruta, c.texto) for c in r.citas]}, ensure_ascii=False) + "\n")
+                                "citas": [(c.ruta, c.linea_ini, c.texto) for c in r.citas]}, ensure_ascii=False) + "\n")
             f.flush()
     return ReporteGeneracion(con_citas, todas_las_notas, alguna_nota, respondibles, no_encontrado, no_respondibles,
-                             sum(tiempos) / max(len(tiempos), 1), fallos, traen, con_evidencia, sin_evidencia)
+                             sum(tiempos) / max(len(tiempos), 1), fallos, traen, con_evidencia, sin_evidencia, lugar)

@@ -28,6 +28,7 @@ class Nota:
     enlaces: list[Enlace]
     frontmatter: dict
     frontmatter_invalido: bool
+    titulo: str | None = None  # el del documento, si lo trae (`<title>`); si no, el nombre del archivo
 
 
 def analizar(textos: list[str]) -> list[Nota]:

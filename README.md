@@ -17,7 +17,7 @@
 
 ### Descripción general
 
-**Doll** es un RAG local sobre notas Markdown: busca en tus notas sin leerlas completas, responde con un modelo propio y verifica por código que cada cita exista en el texto recuperado. También propone dónde va una nota nueva, sin escribir en ella. El nombre viene de RAG doll, muñeca de trapo.
+**Doll** es un RAG local sobre notas Markdown, HTML y PDF: busca en tus notas sin leerlas completas, responde con un modelo propio y verifica por código que cada cita exista en el texto recuperado. También propone dónde va una nota nueva, sin escribir en ella. El nombre viene de RAG doll, muñeca de trapo.
 
 El código es público y los datos no: cada corpus es un floppy en `~/.doll/floppies/`, con su configuración, su índice y sus preguntas de evaluación. Los ejemplos y las pruebas usan solo la bóveda ficticia de `tests/boveda/`.
 
@@ -74,6 +74,9 @@ uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"
 ## Features
 
 - Fragmentos por encabezado, con ruta, líneas y hash por nota, partidos por `doll-parser`, un filtro en Rust.
+- HTML por encabezado, con las líneas del archivo fuente, y PDF por página, citado como `archivo.pdf, p. 12`. Un PDF solo se vuelve a extraer si cambia su tamaño o su fecha.
+- Cada corpus es un floppy, y uno está montado a la vez. Por MCP, cada herramienta puede pedir otro floppy solo para esa llamada.
+- `tapar` quita del índice frases como un nombre o un número de expediente, sin distinguir mayúsculas, acentos ni separadores.
 - Búsqueda FTS5 que ignora acentos, sin servicios externos, con tope de fragmentos por nota, a lo más 2 lugares para notas de terceros y expansión a las notas enlazadas con `[[wikilinks]]`.
 - Búsqueda por sentido en las notas de terceros, con vectores de bge-m3 que calcula Bakery en CPU.
 - Filtro por `tipo` y `dominio` del frontmatter, y alcance por carpeta según frases configurables.
@@ -93,6 +96,7 @@ Medido con un modelo local sobre un corpus real de 521 notas; detalle, sets y lo
 - Rechazó las 11 preguntas sin respuesta de ese set, pero en otras pruebas limpias solo 5 de 7.
 - `buscar` y `preguntar` buscan por palabras. La búsqueda por sentido (71 % de recall@5 contra 58 % de FTS5) solo cubre notas de terceros.
 - Agregar notas puede bajar el recall de las que ya estaban: al crecer el corpus hay que volver a medir.
+- En PDF y HTML, la cita cayó en la página o sección del dato en 9 de 10 y en 8 de 11. Una pregunta en español sobre un documento en inglés no siempre trae la sección, y un PDF escaneado no entra.
 - `acomodar` acierta la carpeta en 87 % y el proyecto en 88 %, pero `tipo` en 73 %: es una sugerencia que hay que revisar. Ningún set es del todo ciego.
 
 ## Autoría

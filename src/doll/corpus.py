@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 
 # Fijas en el código: un floppy.toml incompleto no debe exponer estas carpetas.
 EXCLUIR_SIEMPRE = ("gente/**", "life/**")
+FORMATOS = (".md", ".html", ".htm", ".pdf")  # Markdown va a doll-parser; los demás, a `extraer`
 
 
 def home() -> Path:
@@ -46,6 +47,8 @@ class Corpus:
     terceros: tuple[str, ...] = ()  # notas con texto ajeno: entrada no confiable
     mcp_excluir: tuple[str, ...] | None = None  # None: sin configurar, el MCP no arranca
     alcances: tuple[tuple[str, str], ...] = ()  # (regex de la pregunta, carpeta a la que se limita)
+    incluir: tuple[str, ...] = ("**/*.md",)  # qué archivos de la fuente entran, antes de `excluir`
+    tapar: tuple[str, ...] = ()  # frases que no se guardan en el índice (datos personales dentro de un documento)
 
     @property
     def carpeta(self) -> Path:
@@ -76,27 +79,42 @@ class Corpus:
             return False  # .obsidian, .git y similares no son notas
         return not any(ruta.full_match(p) for p in EXCLUIR_SIEMPRE + self.excluir)
 
-    def _archivos(self) -> dict[str, Path]:
-        archivos = {}
+    def _recorrer(self):
         for carpeta, subcarpetas, nombres in self.ruta.walk():
             subcarpetas[:] = [s for s in subcarpetas if not s.startswith(".")]  # .git pesa más que las notas
             for nombre in nombres:
-                if nombre.endswith(".md"):
-                    archivos[(carpeta / nombre).relative_to(self.ruta).as_posix()] = carpeta / nombre
+                if nombre.lower().endswith(FORMATOS):  # antes de armar rutas: una fuente puede traer miles de archivos
+                    yield carpeta / nombre
+
+    def _archivos(self) -> dict[str, Path]:
+        archivos = {}
+        for patron in self.incluir:
+            # Con `**` se recorre todo, podando carpetas ocultas que glob sí recorrería. Sin `**`, glob solo abre
+            # las carpetas del patrón: una fuente grande (todo iroFactory) no se recorre en cada `buscar`.
+            for archivo in self._recorrer() if "**" in patron else self.ruta.glob(patron):
+                if not archivo.name.lower().endswith(FORMATOS):
+                    continue
+                relativa = archivo.relative_to(self.ruta).as_posix()
+                if PurePosixPath(relativa).full_match(patron, case_sensitive=False) and archivo.is_file():
+                    archivos[relativa] = archivo
         return archivos
 
-    def notas(self) -> dict[str, str]:
-        """Texto de cada nota incluida, por ruta relativa con diagonales."""
-        rutas = self._archivos()
-        return {
-            relativa: rutas[relativa].read_text(encoding="utf-8", errors="replace")
-            for relativa in sorted(rutas)
-            if self.incluida(relativa)
-        }
+    def leer(self) -> tuple[dict[str, str], dict[str, Path], list[str]]:
+        """De una sola pasada por la fuente: texto de cada nota Markdown, HTML y PDF por extraer, y excluidas."""
+        archivos = self._archivos()
+        notas, documentos, excluidas = {}, {}, []
+        for relativa in sorted(archivos):
+            if not self.incluida(relativa):
+                excluidas.append(relativa)  # no se leen: solo sirven para reconocer enlaces que apuntan a ellas
+            elif relativa.lower().endswith(".md"):
+                notas[relativa] = archivos[relativa].read_text(encoding="utf-8", errors="replace")
+            else:
+                documentos[relativa] = archivos[relativa]  # se extraen solo si cambiaron: extraer un PDF tarda
+        return notas, documentos, excluidas
 
-    def excluidas(self) -> list[str]:
-        """Rutas que no se leen, solo para reconocer los enlaces que apuntan a ellas."""
-        return sorted(r for r in self._archivos() if not self.incluida(r))
+    def notas(self) -> dict[str, str]:
+        """Texto de cada nota Markdown incluida, por ruta relativa con diagonales."""
+        return self.leer()[0]
 
 
 def cargar(nombre: str | None = None) -> Corpus:
@@ -124,5 +142,14 @@ def cargar(nombre: str | None = None) -> Corpus:
             re.compile(regex)
         except re.error as e:
             raise SystemExit(f"Regex inválida en alcances de {nombre!r}: {e}") from None
+    incluir = tuple(datos.get("incluir", ("**/*.md",)))
+    if not incluir:
+        raise SystemExit(f"`incluir` vacío en el floppy {nombre!r}: no entraría ningún archivo")
+    for patron in incluir:
+        if PurePosixPath(patron).is_absolute() or ".." in PurePosixPath(patron).parts or ":" in patron:
+            raise SystemExit(f"`incluir` sale de la fuente en el floppy {nombre!r}: {patron!r}")
+    tapar = tuple(datos.get("tapar", ()))
+    if any(not isinstance(t, str) or len(t.strip()) < 3 for t in tapar):
+        raise SystemExit(f"`tapar` en el floppy {nombre!r}: cada frase, de 3 caracteres o más")
     return Corpus(nombre, ruta, tuple(datos.get("excluir", ())), tuple(datos.get("terceros", ())),
-                  None if mcp_excluir is None else tuple(mcp_excluir), alcances)
+                  None if mcp_excluir is None else tuple(mcp_excluir), alcances, incluir, tapar)

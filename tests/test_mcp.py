@@ -89,3 +89,15 @@ def test_montar_uno_sin_mcp_excluir_no_tumba_el_servidor(home):
         llamar(servidor, "buscar", consulta="escape cilindro")
     (home / "montado").write_text("t", encoding="utf-8")
     assert "Escapes" in llamar(servidor, "buscar", consulta="escape cilindro")
+
+
+def test_floppy_por_llamada_usa_su_propio_mcp_excluir(home):
+    configurar(home, home / "boveda", "mcp_excluir = []")
+    configurar(home, home / "boveda", 'mcp_excluir = ["recursos/oficios/**"]', nombre="u")
+    (home / "montado").write_text("u", encoding="utf-8")
+    servidor = mcp_server.crear()
+    assert "recursos/oficios/" not in llamar(servidor, "buscar", consulta="escape cilindro")
+    assert "recursos/oficios/" in llamar(servidor, "buscar", consulta="escape cilindro", floppy="t")
+    assert "recursos/oficios/" not in llamar(servidor, "buscar", consulta="escape cilindro")  # el montado no cambia
+    with pytest.raises(Exception, match="inválido"):
+        llamar(servidor, "buscar", consulta="escape", floppy="../t")

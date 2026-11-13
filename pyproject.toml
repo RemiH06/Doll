@@ -12,6 +12,7 @@ requires-python = ">=3.13"
 dependencies = [
     "bakers",
     "doll-parser",
+    "pypdf>=7.0.1",
 ]
 
 [project.scripts]
