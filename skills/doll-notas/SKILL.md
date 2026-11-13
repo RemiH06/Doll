@@ -31,7 +31,8 @@ Empieza por `buscar`: corre en local, sin modelo, y el índice se actualiza solo
 - "No encontrado" es una respuesta válida: dila en lugar de inventar.
 - Una cita verificada prueba que el texto existe, no que conteste la pregunta. Revisa el fragmento antes de afirmar.
 - Si una búsqueda no trae nada, prueba con sinónimos o con el nombre propio antes de concluir que no está.
-- Hay carpetas que no se indexan o que el MCP oculta a propósito (`excluir` y `mcp_excluir` en `~/.doll/corpus.toml`). No las busques por otro camino.
+- Hay carpetas que no se indexan o que el MCP oculta a propósito (`excluir` y `mcp_excluir` en el `floppy.toml` de cada floppy). No las busques por otro camino.
+- Doll busca en el floppy montado (`doll montar` sin nombre lo muestra). No montes otro sin preguntar: cambia el de la CLI, el de las demás sesiones y el del panel. Para consultar otro una sola vez: `doll --floppy NOMBRE buscar "consulta"`.
 - Si no hay MCP ni CLI, dilo y pregunta antes de leer las notas a mano.
 
 ## Ejemplo

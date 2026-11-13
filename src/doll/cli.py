@@ -8,9 +8,8 @@ from doll.indice import Filtro
 from doll.preguntar import preguntar, texto_fragmentos, texto_respuesta
 
 
-def _indice(nombre: str):
-    corpus = corpus_mod.cargar(nombre)
-    con = indice.abrir(corpus_mod.home() / f"{nombre}.db")
+def _indice(corpus):
+    con = indice.abrir(corpus.indice)
     return con, indice.indexar(con, corpus)
 
 
@@ -19,17 +18,18 @@ def _filtro(args, corpus) -> Filtro:
 
 
 def _indexar(args) -> None:
-    con, (cambiadas, quitadas) = _indice(args.corpus)
-    print(f"{cambiadas} notas reindexadas, {quitadas} quitadas")
+    corpus = corpus_mod.cargar(args.floppy)
+    con, (cambiadas, quitadas) = _indice(corpus)
+    print(f"{corpus.nombre}: {cambiadas} notas reindexadas, {quitadas} quitadas")
     if args.sentido:
         from doll import sentido
 
-        print(f"{sentido.llenar(con, corpus_mod.cargar(args.corpus))} fragmentos de terceros embebidos")
+        print(f"{sentido.llenar(con, corpus)} fragmentos de terceros embebidos")
 
 
 def _buscar(args) -> None:
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
+    corpus = corpus_mod.cargar(args.floppy)
+    con, _ = _indice(corpus)
     if not args.sentido:
         return print(texto_fragmentos(indice.buscar(con, args.consulta, args.k, _filtro(args, corpus)), corpus))
     if args.tipo or args.dominio:
@@ -43,15 +43,15 @@ def _buscar(args) -> None:
 
 
 def _preguntar(args) -> None:
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
+    corpus = corpus_mod.cargar(args.floppy)
+    con, _ = _indice(corpus)
     print(texto_respuesta(preguntar(con, corpus, args.consulta, args.k, filtro=_filtro(args, corpus)), corpus))
 
 
 def _generacion(args) -> None:
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
-    eval_dir = corpus_mod.home() / "eval"
+    corpus = corpus_mod.cargar(args.floppy)
+    con, _ = _indice(corpus)
+    eval_dir = corpus.eval
     g = evaluar_mod.evaluar_generacion(
         evaluar_mod.cargar_preguntas(eval_dir / f"{args.set}.toml"),
         lambda consulta: preguntar(con, corpus, consulta, args.k, filtro=Filtro(terceros=corpus.terceros)),
@@ -71,14 +71,14 @@ def _acomodar(args) -> None:
 
     from doll.acomodar import acomodar, acomodar_nota, texto_propuestas, texto_propuestas_nota
 
-    corpus = corpus_mod.cargar(args.corpus)
+    corpus = corpus_mod.cargar(args.floppy)
     terceros = {corpus.es_terceros(r) for r in args.rutas}
     if True in terceros and False in terceros:
         raise SystemExit("No mezcles notas de inspiración con otras: se acomodan distinto")
     try:
         if True in terceros:
             return print(texto_propuestas(acomodar(corpus, args.rutas)))
-        con, _ = _indice(args.corpus)
+        con, _ = _indice(corpus)
         print(texto_propuestas_nota(acomodar_nota(con, corpus, args.rutas)))
     except BakerError as e:
         raise SystemExit(f"Sin propuesta, el modelo no respondió: {e}") from None
@@ -89,9 +89,9 @@ def _evaluar_acomodar_boveda(args) -> None:
 
     from doll.acomodar import acomodar_nota
 
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
-    eval_dir = corpus_mod.home() / "eval"
+    corpus = corpus_mod.cargar(args.floppy)
+    con, _ = _indice(corpus)
+    eval_dir = corpus.eval
     etiquetas = tomllib.loads((eval_dir / "acomodar-boveda.toml").read_text(encoding="utf-8"))["notas"]
     # Dos mitades: cada una se acomoda sin estar en los ejemplos, y la otra mitad sí cuenta como bóveda.
     propuestas = {}
@@ -111,8 +111,8 @@ def _evaluar_acomodar(args) -> None:
 
     from doll.acomodar import acomodar
 
-    corpus = corpus_mod.cargar(args.corpus)
-    eval_dir = corpus_mod.home() / "eval"
+    corpus = corpus_mod.cargar(args.floppy)
+    eval_dir = corpus.eval
     etiquetas = tomllib.loads((eval_dir / "acomodar.toml").read_text(encoding="utf-8"))["notas"]
     propuestas = acomodar(corpus, [e["ruta"] for e in etiquetas])
     r = evaluar_mod.evaluar_acomodar(etiquetas, propuestas, corpus.notas(), eval_dir / "ultima-acomodar.jsonl")
@@ -127,9 +127,9 @@ def _evaluar_inspo(args) -> None:
 
     from doll import sentido
 
-    corpus = corpus_mod.cargar(args.corpus)
-    con, _ = _indice(args.corpus)
-    busquedas = tomllib.loads((corpus_mod.home() / "eval" / "inspo-busquedas.toml").read_text("utf-8"))["busquedas"]
+    corpus = corpus_mod.cargar(args.floppy)
+    con, _ = _indice(corpus)
+    busquedas = tomllib.loads((corpus.eval / "inspo-busquedas.toml").read_text("utf-8"))["busquedas"]
     terceros = Filtro(solo=corpus.terceros)
 
     def notas(fragmentos) -> list[str]:
@@ -149,7 +149,21 @@ def _evaluar_inspo(args) -> None:
 def _mcp(args) -> None:
     from doll.mcp_server import crear  # import aquí: la CLI no carga el paquete mcp
 
-    crear(args.corpus).run()
+    crear(args.floppy).run()
+
+
+def _montar(args) -> None:
+    if args.nombre:
+        corpus_mod.montar(args.nombre)
+    try:
+        actual = corpus_mod.montado()
+    except SystemExit:
+        actual = None  # sin montar todavía: igual se listan
+    disponibles = corpus_mod.disponibles()
+    if not disponibles:
+        print(f"Sin floppies en {corpus_mod.floppies()}")
+    for nombre in disponibles:
+        print(f"{'*' if nombre == actual else ' '} {nombre}")
 
 
 def _evaluar(args) -> None:
@@ -161,15 +175,15 @@ def _evaluar(args) -> None:
         return _evaluar_inspo(args)
     if args.generacion:
         return _generacion(args)
-    corpus = corpus_mod.cargar(args.corpus)
+    corpus = corpus_mod.cargar(args.floppy)
     notas = corpus.notas()
-    con, _ = _indice(args.corpus)
+    con, _ = _indice(corpus)
 
     def fts(consulta: str, k: int) -> list[tuple[str, int]]:
         return [(r.ruta, len(r.texto)) for r in indice.buscar(con, consulta, k, Filtro(terceros=corpus.terceros))]
 
     motores = {"grep": lambda c, k: grep.buscar(c, notas, k), "fts": fts}
-    archivo = corpus_mod.home() / "eval" / f"{args.set}.toml"
+    archivo = corpus.eval / f"{args.set}.toml"
     reporte = evaluar_mod.evaluar(evaluar_mod.cargar_preguntas(archivo), motores[args.motor], args.k)
     print(f"motor {args.motor} | {len(notas)} notas | {sum(map(len, notas.values()))} chars")
     print(f"recall@{args.k}: {reporte.recall:.2f}")
@@ -183,7 +197,7 @@ def _evaluar(args) -> None:
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(prog="doll")
-    parser.add_argument("--corpus", default="boveda")
+    parser.add_argument("--floppy", help="usa este floppy y no el montado, solo en este comando")
     subs = parser.add_subparsers(required=True)
 
     ix = subs.add_parser("indexar", help="sincroniza el índice con las notas")
@@ -205,7 +219,7 @@ def main() -> None:
     pr.add_argument("--dominio", help="solo notas con este dominio")
     pr.set_defaults(func=_preguntar)
 
-    ev = subs.add_parser("evaluar", help="mide un motor contra ~/.doll/eval/<set>.toml")
+    ev = subs.add_parser("evaluar", help="mide un motor contra eval/<set>.toml del floppy")
     ev.add_argument("--motor", default="fts", choices=["grep", "fts"])
     ev.add_argument("--set", default="preguntas", choices=["preguntas", "control", "nuevas", "confirmacion", "docs", "acomodar",
                                                  "acomodar-boveda", "inspo-busquedas"])
@@ -217,7 +231,11 @@ def main() -> None:
     ac.add_argument("rutas", nargs="+", help="relativas a la bóveda; las de inspiración, en la carpeta de su tabla de clases")
     ac.set_defaults(func=_acomodar)
 
-    mc = subs.add_parser("mcp", help="servidor MCP por stdio")
+    mo = subs.add_parser("montar", help="monta un floppy para la CLI, el MCP y el panel; sin nombre, lista los floppies")
+    mo.add_argument("nombre", nargs="?")
+    mo.set_defaults(func=_montar)
+
+    mc = subs.add_parser("mcp", help="servidor MCP por stdio; sin --floppy, sigue al montado en cada llamada")
     mc.set_defaults(func=_mcp)
 
     args = parser.parse_args()

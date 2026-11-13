@@ -216,7 +216,7 @@ def test_cli_sin_gateway_avisa_sin_traceback(boveda, monkeypatch):
         raise BakerError("Falta la variable de entorno BAKERS_URL")
 
     corpus = replace(boveda, terceros=("insp/**",))
-    monkeypatch.setattr(cli.corpus_mod, "cargar", lambda nombre: corpus)
+    monkeypatch.setattr(cli.corpus_mod, "cargar", lambda nombre=None: corpus)
     monkeypatch.setattr(acomodar_mod.tabla_clases, "asignar", caido)
     with pytest.raises(SystemExit, match="Sin propuesta.*BAKERS_URL"):
-        cli._acomodar(Namespace(corpus="t", rutas=["insp/2026-01-01-a.md"]))
+        cli._acomodar(Namespace(floppy="t", rutas=["insp/2026-01-01-a.md"]))

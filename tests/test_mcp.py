@@ -11,9 +11,10 @@ from doll import mcp_server  # noqa: E402
 BOVEDA = Path(__file__).parent / "boveda"
 
 
-def configurar(home: Path, boveda: Path, extra: str) -> None:
-    (home / "corpus.toml").write_text(
-        f'[t]\nruta = "{boveda.as_posix()}"\nterceros = ["recursos/reels/**"]\n{extra}\n', encoding="utf-8"
+def configurar(home: Path, boveda: Path, extra: str, nombre: str = "t") -> None:
+    (home / "floppies" / nombre).mkdir(parents=True, exist_ok=True)
+    (home / "floppies" / nombre / "floppy.toml").write_text(
+        f'fuente = "{boveda.as_posix()}"\nterceros = ["recursos/reels/**"]\n{extra}\n', encoding="utf-8"
     )
 
 
@@ -66,3 +67,25 @@ def test_buscar_inspiracion_sin_gateway_usa_fts_solo_en_terceros(home):
     salida = llamar(mcp_server.crear("t"), "buscar_inspiracion", consulta="campana torre escape")
     assert salida.startswith("Sin búsqueda por sentido") and "Afinar campanas" in salida
     assert "Reloj de torre" not in salida and "Escapes" not in salida
+
+
+def test_sigue_al_montado_sin_reiniciar(home):
+    configurar(home, home / "boveda", "mcp_excluir = []")
+    configurar(home, home / "boveda", 'mcp_excluir = ["recursos/oficios/**"]', nombre="u")
+    (home / "montado").write_text("t", encoding="utf-8")
+    servidor = mcp_server.crear()
+    assert "Escapes" in llamar(servidor, "buscar", consulta="escape cilindro")
+    (home / "montado").write_text("u", encoding="utf-8")
+    assert "oficios" not in llamar(servidor, "buscar", consulta="escape cilindro")
+
+
+def test_montar_uno_sin_mcp_excluir_no_tumba_el_servidor(home):
+    configurar(home, home / "boveda", "mcp_excluir = []")
+    configurar(home, home / "boveda", "", nombre="u")
+    (home / "montado").write_text("t", encoding="utf-8")
+    servidor = mcp_server.crear()
+    (home / "montado").write_text("u", encoding="utf-8")
+    with pytest.raises(Exception, match="mcp_excluir"):
+        llamar(servidor, "buscar", consulta="escape cilindro")
+    (home / "montado").write_text("t", encoding="utf-8")
+    assert "Escapes" in llamar(servidor, "buscar", consulta="escape cilindro")

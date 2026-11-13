@@ -19,7 +19,7 @@
 
 **Doll** es un RAG local sobre notas Markdown: busca en tus notas sin leerlas completas, responde con un modelo propio y verifica por código que cada cita exista en el texto recuperado. También propone dónde va una nota nueva, sin escribir en ella. El nombre viene de RAG doll, muñeca de trapo.
 
-El código es público y los datos no: los índices, la configuración de cada corpus y las preguntas de evaluación viven en `~/.doll/`. Los ejemplos y las pruebas usan solo la bóveda ficticia de `tests/boveda/`.
+El código es público y los datos no: cada corpus es un floppy en `~/.doll/floppies/`, con su configuración, su índice y sus preguntas de evaluación. Los ejemplos y las pruebas usan solo la bóveda ficticia de `tests/boveda/`.
 
 Documentación completa: [remih06.github.io/Doll](https://remih06.github.io/Doll/). Para que un agente use Doll hay dos skills de ejemplo en [`skills/`](skills/).
 
@@ -39,17 +39,17 @@ uv sync
 uv run pytest
 ```
 
-3. Crea `~/.doll/corpus.toml` con la carpeta de tus notas (todas las claves en [configuración](https://remih06.github.io/Doll/#configuracion)):
+3. Crea un floppy: `~/.doll/floppies/notas/floppy.toml` con la carpeta de tus notas (todas las claves en [configuración](https://remih06.github.io/Doll/#configuracion)):
 
 ```toml
-[boveda]
-ruta = "/ruta/a/tus/notas"
+fuente = "/ruta/a/tus/notas"
 mcp_excluir = []
 ```
 
-4. Indexa y busca:
+4. Móntalo, indexa y busca:
 
 ```bash
+uv run doll montar notas
 uv run doll indexar
 uv run doll buscar "escape de áncora"
 ```
@@ -62,9 +62,10 @@ uv run doll buscar "escape de áncora"
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D] [--sentido]`: fragmentos con ruta y líneas. Con `--sentido`, busca por sentido y solo en notas de terceros.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll acomodar RUTA...`: propone dónde va cada nota; no escribe nada.
-- `doll mcp`: servidor MCP por stdio, con las herramientas `buscar`, `buscar_inspiracion` y `preguntar_notas`. Cómo registrarlo en Claude Code: [MCP](https://remih06.github.io/Doll/#mcp).
-- `doll evaluar [--motor fts|grep] [--generacion] [--set NOMBRE] [-k N]`: mide contra `~/.doll/eval/<set>.toml` (ver [evaluación](https://remih06.github.io/Doll/#evaluacion)).
-- `--corpus NOMBRE`, antes del comando: elige el corpus; por defecto, `boveda`.
+- `doll montar [NOMBRE]`: monta un floppy para la CLI, el MCP y el panel de Bakery; sin nombre, lista los floppies y marca el montado.
+- `doll mcp`: servidor MCP por stdio, con las herramientas `buscar`, `buscar_inspiracion` y `preguntar_notas`. Cada llamada usa el floppy montado en ese momento. Cómo registrarlo en Claude Code: [MCP](https://remih06.github.io/Doll/#mcp).
+- `doll evaluar [--motor fts|grep] [--generacion] [--set NOMBRE] [-k N]`: mide contra `eval/<set>.toml` del floppy (ver [evaluación](https://remih06.github.io/Doll/#evaluacion)).
+- `--floppy NOMBRE`, antes del comando: usa ese floppy y no el montado, solo en ese comando.
 
 ```bash
 uv run doll preguntar "¿Cuándo se inventó el escape de áncora?"

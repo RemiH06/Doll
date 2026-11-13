@@ -242,7 +242,7 @@ footer p + p { margin-top: 6px; }
           <p>Propone carpeta, <code>tipo</code>, <code>estado</code>, dominio, proyecto y enlaces para una nota nueva. Solo propone: lo aplica una persona.</p>
         </article>
       </div>
-      <p class="nota">El código es público y los datos no. Los índices, la configuración de cada corpus y las preguntas de evaluación viven en <code>~/.doll/</code>, fuera del repo. El registro guarda tiempos y conteos, nunca preguntas ni fragmentos.</p>
+      <p class="nota">El código es público y los datos no. Cada corpus es un floppy en <code>~/.doll/floppies/</code>, fuera del repo, con su configuración, su índice y sus preguntas de evaluación. El registro guarda tiempos y conteos, nunca preguntas ni fragmentos.</p>
     </section>
 
     <section id="instalar" class="revela">
@@ -254,12 +254,12 @@ footer p + p { margin-top: 6px; }
 <span class="p">$ </span>cd Doll
 <span class="p">$ </span>uv sync
 <span class="p">$ </span>uv run pytest</code></pre></div></li>
-        <li>Crea <code>~/.doll/corpus.toml</code> con la carpeta de tus notas (todas las claves en <a href="#configuracion">configuración</a>):
-          <div class="codigo"><pre><code>[boveda]
-ruta = "/ruta/a/tus/notas"
+        <li>Crea un floppy: <code>~/.doll/floppies/notas/floppy.toml</code> con la carpeta de tus notas (todas las claves en <a href="#configuracion">configuración</a>):
+          <div class="codigo"><pre><code>fuente = "/ruta/a/tus/notas"
 mcp_excluir = []</code></pre></div></li>
-        <li>Indexa y busca:
-          <div class="codigo"><pre><code><span class="p">$ </span>uv run doll indexar
+        <li>Móntalo, indexa y busca:
+          <div class="codigo"><pre><code><span class="p">$ </span>uv run doll montar notas
+<span class="p">$ </span>uv run doll indexar
 <span class="p">$ </span>uv run doll buscar "escape de áncora"
 <span class="c">recursos/oficios/Escapes.md:11-14 [Escapes &gt; Escape de áncora]
 Inventado hacia 1657. Es el más común en relojes de torre porque tolera un péndulo largo.</span></code></pre></div></li>
@@ -276,9 +276,10 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
           <tr><td><code>doll buscar "consulta"</code></td><td>Fragmentos con ruta y líneas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>, <code>--sentido</code>.</td></tr>
           <tr><td><code>doll preguntar "consulta"</code></td><td>Respuesta con citas verificadas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>.</td></tr>
           <tr><td><code>doll acomodar RUTA...</code></td><td>Propone dónde va cada nota; no escribe nada.</td></tr>
-          <tr><td><code>doll mcp</code></td><td>Servidor MCP por stdio con <code>buscar</code>, <code>buscar_inspiracion</code> y <code>preguntar_notas</code>.</td></tr>
-          <tr><td><code>doll evaluar</code></td><td>Mide contra <code>~/.doll/eval/&lt;set&gt;.toml</code>. Opciones: <code>--set NOMBRE</code>, <code>--motor fts|grep</code>, <code>--generacion</code>, <code>-k N</code>.</td></tr>
-          <tr><td><code>--corpus NOMBRE</code></td><td>Antes del comando, elige el corpus. Por defecto, <code>boveda</code>.</td></tr>
+          <tr><td><code>doll montar [NOMBRE]</code></td><td>Monta un floppy para la CLI, el MCP y el panel de Bakery. Sin nombre, lista los floppies y marca el montado.</td></tr>
+          <tr><td><code>doll mcp</code></td><td>Servidor MCP por stdio con <code>buscar</code>, <code>buscar_inspiracion</code> y <code>preguntar_notas</code>. Cada llamada usa el floppy montado en ese momento.</td></tr>
+          <tr><td><code>doll evaluar</code></td><td>Mide contra <code>eval/&lt;set&gt;.toml</code> del floppy. Opciones: <code>--set NOMBRE</code>, <code>--motor fts|grep</code>, <code>--generacion</code>, <code>-k N</code>.</td></tr>
+          <tr><td><code>--floppy NOMBRE</code></td><td>Antes del comando, usa ese floppy y no el montado, solo en ese comando.</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -287,7 +288,7 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
       <h2>Cómo funciona</h2>
       <p>Doll indexa notas Markdown en SQLite y las consulta de tres maneras. Los modelos viven en Bakery: Doll no carga ninguno.</p>
       <ol class="flujo">
-        <li><strong>Notas Markdown</strong> <span class="etiqueta">corpus.toml</span><p class="tenue">Las carpetas excluidas no entran. Un enlace a una nota excluida se tapa como <code>[[…]]</code>, también en el texto, para que su nombre no se pueda buscar.</p></li>
+        <li><strong>Notas Markdown</strong> <span class="etiqueta">floppy.toml</span><p class="tenue">Las carpetas excluidas no entran. Un enlace a una nota excluida se tapa como <code>[[…]]</code>, también en el texto, para que su nombre no se pueda buscar.</p></li>
         <li><strong>doll-parser</strong> <span class="etiqueta">Rust</span><p class="tenue">Parte cada nota por encabezado y saca sus enlaces y su frontmatter. Cada fragmento guarda ruta, líneas y texto.</p></li>
         <li><strong>Índice SQLite</strong> <span class="etiqueta">FTS5 + vectores</span><p class="tenue">FTS5 ignora acentos y pesa más el título (5) y el encabezado (3) que el texto (1). Solo se reprocesan las notas cuyo hash cambió. Los vectores de bge-m3 cubren solo notas de terceros.</p></li>
         <li><strong>Consulta</strong>
@@ -303,19 +304,18 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
 
     <section id="configuracion" class="revela">
       <h2>Configuración</h2>
-      <p>Doll lee <code>~/.doll/corpus.toml</code>; con <code>DOLL_HOME</code> se cambia la carpeta. Cada tabla es un corpus, y las rutas son relativas a <code>ruta</code>:</p>
-      <div class="codigo"><pre><code>[boveda]
-ruta = "/ruta/a/tus/notas"
+      <p>Cada corpus es un floppy: una carpeta en <code>~/.doll/floppies/</code> con <code>floppy.toml</code>, su índice (<code>indice.db</code>) y sus sets de evaluación (<code>eval/</code>). Uno está montado a la vez (<code>doll montar</code>), y la CLI, el MCP y el panel de Bakery usan ese. Con <code>DOLL_HOME</code> se cambia <code>~/.doll</code>. Las rutas de <code>floppy.toml</code> son relativas a <code>fuente</code>:</p>
+      <div class="codigo"><pre><code>fuente = "/ruta/a/tus/notas"
 excluir = ["privado/**"]
 terceros = ["recortes/**"]
 mcp_excluir = ["borradores/**"]
 
-[boveda.alcances]
+[alcances]
 'notas? de recortes' = "recortes/**"</code></pre></div>
       <div class="tabla"><table>
         <thead><tr><th scope="col">Clave</th><th scope="col">Para qué</th></tr></thead>
         <tbody>
-          <tr><td><code>ruta</code></td><td>Carpeta con las notas.</td></tr>
+          <tr><td><code>fuente</code></td><td>Carpeta con las notas. El índice se pone al día solo cuando cambian.</td></tr>
           <tr><td><code>excluir</code></td><td>Notas que no entran al índice. <code>gente/**</code> y <code>life/**</code> quedan fuera siempre.</td></tr>
           <tr><td><code>terceros</code></td><td>Notas escritas por otros (recortes, reels). Su texto va marcado como no confiable, ocupan a lo más 2 de los primeros lugares y son las únicas que entran a la búsqueda por sentido.</td></tr>
           <tr><td><code>mcp_excluir</code></td><td>Notas que el MCP no entrega, aunque la CLI sí. Es obligatoria para arrancar el servidor: <code>[]</code> si no quieres ocultar nada.</td></tr>
