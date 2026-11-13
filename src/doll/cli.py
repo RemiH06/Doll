@@ -163,6 +163,11 @@ def _exportar(args) -> None:
     salida = args.salida or Path(f"{corpus.nombre}-v{corpus.version}.zip")
     e = floppy.exportar(corpus, salida, args.con_eval)
     print(f"{salida}: {e.notas} notas, {e.documentos} documentos, {e.vectores} vectores, versión {corpus.version}")
+    if e.sin_texto:
+        print(f"{e.sin_texto} documentos sin texto no van en el zip")
+    if e.sin_vector:
+        print(f"{e.sin_vector} fragmentos de terceros sin vector: quien importe los embebe. Para que viajen, corre"
+              f" `doll --floppy {corpus.nombre} indexar --sentido` y exporta otra vez")
 
 
 def _importar(args) -> None:
@@ -226,7 +231,8 @@ def main() -> None:
     subs = parser.add_subparsers(required=True)
 
     ix = subs.add_parser("indexar", help="sincroniza el índice con las notas")
-    ix.add_argument("--sentido", action="store_true", help="también embebe las notas de terceros (tarda la primera vez)")
+    ix.add_argument("--sentido", action="store_true", help="también embebe las notas de terceros. Tarda la primera vez: en un floppy grande,"
+                    " hazlo aparte o antes de exportar, porque `buscar --sentido` no embebe tanto en línea")
     ix.set_defaults(func=_indexar)
 
     bu = subs.add_parser("buscar", help="fragmentos con ruta y líneas")

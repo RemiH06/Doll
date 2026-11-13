@@ -272,7 +272,7 @@ Inventado hacia 1657. Es el más común en relojes de torre porque tolera un pé
       <div class="tabla"><table>
         <thead><tr><th scope="col">Comando</th><th scope="col">Qué hace</th></tr></thead>
         <tbody>
-          <tr><td><code>doll indexar [--sentido]</code></td><td>Sincroniza el índice con las notas y solo reprocesa las que cambiaron. Con <code>--sentido</code>, también embebe los fragmentos de terceros que no tienen vector (la primera vez, unos 0.4 s por fragmento en CPU).</td></tr>
+          <tr><td><code>doll indexar [--sentido]</code></td><td>Sincroniza el índice con las notas y solo reprocesa las que cambiaron. Con <code>--sentido</code>, también embebe los fragmentos de terceros que no tienen vector (la primera vez, unos 0.4 s por fragmento en CPU). <code>buscar --sentido</code> embebe en línea hasta 200; si faltan más, responde con FTS y lo dice.</td></tr>
           <tr><td><code>doll buscar "consulta"</code></td><td>Fragmentos con ruta y líneas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>, <code>--sentido</code>.</td></tr>
           <tr><td><code>doll preguntar "consulta"</code></td><td>Respuesta con citas verificadas. Opciones: <code>-k N</code>, <code>--tipo T</code>, <code>--dominio D</code>.</td></tr>
           <tr><td><code>doll acomodar RUTA...</code></td><td>Propone dónde va cada nota; no escribe nada.</td></tr>
@@ -328,7 +328,7 @@ mcp_excluir = ["borradores/**"]
         </tbody>
       </table></div>
       <h3 id="compartir">Compartir un floppy</h3>
-      <p><code>doll exportar</code> arma un zip con las notas ya filtradas, un manifiesto con el sha256 de cada archivo, su firma y los vectores de esas notas. No lleva <code>fuente</code>, <code>excluir</code>, <code>mcp_excluir</code> ni <code>tapar</code>: dirían qué se quitó. Un enlace o una ruta con carpeta hacia algo que no sale se tapa en el texto, también en el frontmatter. Un floppy con PDF o HTML y <code>tapar</code> no se exporta, porque las frases no se pueden quitar de un PDF. Firma con <code>ssh-keygen</code>, que viene con OpenSSH; la llave se declara en <code>~/.doll/doll.toml</code>:</p>
+      <p><code>doll exportar</code> arma un zip con las notas ya filtradas, un manifiesto con el sha256 de cada archivo, su firma y los vectores de esas notas. No lleva <code>fuente</code>, <code>excluir</code>, <code>mcp_excluir</code> ni <code>tapar</code>: dirían qué se quitó. Un enlace o una ruta con carpeta hacia algo que no sale se tapa en el texto, también en el frontmatter. Un PDF o HTML no viaja: viaja su texto ya extraído, con <code>tapar</code> aplicado también al título, y en el destino se sigue citando <code>archivo.pdf, p. 12</code>. Un documento sin texto no viaja, y uno con una frase de <code>tapar</code> en su ruta detiene la exportación: va a <code>mcp_excluir</code>. Para que los vectores viajen completos, corre antes <code>doll indexar --sentido</code>. Firma con <code>ssh-keygen</code>, que viene con OpenSSH; la llave se declara en <code>~/.doll/doll.toml</code>:</p>
       <div class="codigo"><pre><code>[instalacion]
 dueno = "ana"
 llave = "~/.ssh/doll_ed25519"</code></pre></div>

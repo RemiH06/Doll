@@ -2,11 +2,13 @@
 
 Uso, desde el clon de Doll: uv run python skills/doll-floppies/revisar_zip.py FLOPPY ZIP
 
-Doll ya tapa enlaces y rutas con carpeta hacia lo que no sale. Esto busca lo que no puede tapar solo: el nombre
-suelto de cada nota que no sale, en el texto y en los nombres de archivo del zip. Imprime nombres de archivo y
-coincidencias, nunca el texto de las notas. Una coincidencia puede ser una palabra común: decide la persona.
+Doll ya tapa enlaces y rutas con carpeta hacia lo que no sale, y las frases de `tapar`. Esto comprueba que ninguna
+frase de `tapar` sobrevive (en notas, texto extraído de documentos y nombres de archivo) y busca lo que Doll no puede
+tapar solo: el nombre suelto de cada nota que no sale. Imprime nombres de archivo y coincidencias, nunca el texto de
+las notas. Una coincidencia de nombre puede ser una palabra común: decide la persona.
 """
 
+import json
 import re
 import sqlite3
 import sys
@@ -23,11 +25,29 @@ notas, documentos, excluidas = c.leer()
 visible = indice.Filtro(ocultar=c.mcp_excluir or ()).admite
 fuera = excluidas + [r for r in [*notas, *documentos] if not visible(r)]
 z = zipfile.ZipFile(sys.argv[2])
-textos = {n: z.read(n).decode("utf-8", errors="replace") for n in z.namelist() if n.endswith((".md", ".toml", ".html", ".htm"))}
+
+
+def texto(nombre: str) -> str:
+    crudo = z.read(nombre).decode("utf-8", errors="replace")
+    if not nombre.endswith(corpus.EXTRAIDOS):
+        return crudo
+    # Decodificado: en el JSON un salto de línea entre dos palabras de una frase es `\n` y no se reconocería.
+    datos = json.loads(crudo)
+    return "\n".join([datos["titulo"] or "", *(f"{f['encabezado']}\n{f['texto']}" for f in datos["fragmentos"])])
+
+
+textos = {n: texto(n) for n in z.namelist() if n.endswith((".md", ".toml", ".html", ".htm", *corpus.EXTRAIDOS))}
 print(f"{len(fuera)} archivos no salen; el zip trae {len(z.namelist())}")
 
 fuera_cf = {r.casefold() for r in fuera}
-print("archivos que no debían salir:", [n for n in z.namelist() if n.removeprefix("notas/").casefold() in fuera_cf] or "ninguno")
+de_fuera = [n for n in z.namelist() if n.removeprefix("notas/").removesuffix(".json").casefold() in fuera_cf]
+print("archivos que no debían salir:", de_fuera or "ninguno")
+print("documentos originales en el zip:", [n for n in z.namelist() if n.endswith(corpus.FORMATOS[1:])] or "ninguno")
+
+frases = indice._patron_tapar(c.tapar)
+tapadas = [n for n, t in textos.items() if frases and frases.search(f"{n}\n{t}")]
+tapadas += [n for n in z.namelist() if n not in textos and frases and frases.search(n)]
+print(f"frases de `tapar` ({len(c.tapar)}) que sobreviven:", tapadas or "ninguna")
 
 nombres = indice._nombres([*notas, *documentos, *fuera])
 vivos = [n for n, t in textos.items() for d in re.findall(r"\[\[([^\[\]]*)\]\]", t)

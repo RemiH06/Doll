@@ -10,6 +10,7 @@ import array
 import hashlib
 import math
 import sqlite3
+import sys
 from collections import Counter
 from dataclasses import replace
 from pathlib import PurePosixPath
@@ -19,9 +20,19 @@ from bakers import core
 from doll import indice
 from doll.corpus import Corpus
 
-TOPE_CHARS = 20_000  # ~6k tokens: debajo del contexto del servidor de embeddings
+# Debajo del lote de 8192 tokens del servidor de embeddings. En bge-m3 (SentencePiece) cada token tiene al menos un
+# carácter: con 8000 no se pasa, en ningún idioma. Por promedio no alcanza: un PDF con 60 % de texto no ASCII dio
+# 8649 tokens en 11 120 caracteres.
+TOPE_CHARS = 8_000
 ESQUEMA = "CREATE TABLE IF NOT EXISTS vectores (hash TEXT PRIMARY KEY, v BLOB NOT NULL)"
 LOTE = 64  # fragmentos por commit: un corte a medias no pierde lo ya calculado
+# Más que esto no se embebe dentro de una búsqueda: a ~0.4 s por fragmento son ~80 s, más ~40 s si el modelo está frío,
+# debajo de los 300 s con que el panel corta el puente. Arriba, `doll indexar --sentido` aparte.
+EN_LINEA = 200
+
+
+class Faltan(Exception):
+    """Demasiados fragmentos sin vector para embeberlos dentro de una búsqueda."""
 
 
 def _texto(r: indice.Resultado) -> str:
@@ -42,18 +53,23 @@ def _fragmentos(con: sqlite3.Connection, corpus: Corpus) -> list[indice.Resultad
     return [r for r in map(indice.Resultado._make, filas) if corpus.es_terceros(r.ruta)]
 
 
-def llenar(con: sqlite3.Connection, corpus: Corpus) -> int:
+def llenar(con: sqlite3.Connection, corpus: Corpus, tope: int | None = None) -> int:
     """Embebe los fragmentos de terceros que no tienen vector y borra los vectores que ya no son de ninguno.
-    Devuelve cuántos embebió. La primera vez tarda (~0.4 s por fragmento en CPU); después, solo lo nuevo."""
+    Devuelve cuántos embebió. La primera vez tarda (~0.4 s por fragmento en CPU); después, solo lo nuevo.
+    Con `tope`, si faltan más, no embebe nada y lanza `Faltan`."""
     con.execute(ESQUEMA)
     textos = {_hash(t): t for t in map(_texto, _fragmentos(con, corpus))}
     hay = {h for (h,) in con.execute("SELECT hash FROM vectores")}
     faltan = [h for h in textos if h not in hay]
+    if tope is not None and len(faltan) > tope:
+        raise Faltan(f"faltan {len(faltan)} vectores; llénalos con `doll --floppy {corpus.nombre} indexar --sentido`")
     for i in range(0, len(faltan), LOTE):
         lote = faltan[i:i + LOTE]
         vectores = core.embeber([textos[h] for h in lote])
         con.executemany("INSERT INTO vectores VALUES (?, ?)", [(h, _unitario(v).tobytes()) for h, v in zip(lote, vectores)])
         con.commit()
+        if len(faltan) > EN_LINEA:  # solo fuera de una búsqueda: un trabajo largo dice por dónde va
+            print(f"{i + len(lote)}/{len(faltan)} fragmentos embebidos", file=sys.stderr, flush=True)
     con.executemany("DELETE FROM vectores WHERE hash = ?", [(h,) for h in hay - textos.keys()])
     con.commit()
     return len(faltan)
@@ -62,11 +78,11 @@ def llenar(con: sqlite3.Connection, corpus: Corpus) -> int:
 def buscar(con: sqlite3.Connection, corpus: Corpus, consulta: str, k: int,
            filtro: indice.Filtro = indice.Filtro()) -> tuple[list[indice.Resultado], str | None]:
     """Hasta k fragmentos de notas de terceros, del más cercano en sentido, con el mismo tope por nota que FTS. El
-    segundo valor es un aviso si no hubo gateway y la respuesta salió de FTS."""
+    segundo valor es un aviso si la respuesta salió de FTS: sin gateway, o con más de EN_LINEA fragmentos sin vector."""
     try:
-        llenar(con, corpus)
+        llenar(con, corpus, EN_LINEA)
         [q] = core.embeber([consulta])
-    except core.BakerError as e:
+    except (core.BakerError, Faltan) as e:
         fts = indice.buscar(con, consulta, k, replace(filtro, solo=corpus.terceros))
         return fts, f"Sin búsqueda por sentido ({e}): resultados de FTS."
     q = _unitario(q)

@@ -65,3 +65,15 @@ def test_sin_gateway_responde_con_fts_y_lo_dice(taller, monkeypatch):
     monkeypatch.setattr(core, "embeber", caido)
     res, aviso = sentido.buscar(con, corpus, "bronce", 5)
     assert "FTS" in aviso and [r.ruta for r in res] == ["recursos/reels/Fundir bronce.md"] * len(res) and res
+
+
+def test_con_muchos_vectores_faltantes_no_embebe_en_linea(taller, monkeypatch):
+    con, corpus = taller
+    llamadas = []
+    monkeypatch.setattr(core, "embeber", falso(llamadas))
+    monkeypatch.setattr(sentido, "EN_LINEA", 1)
+    res, aviso = sentido.buscar(con, corpus, "bronce", 5)
+    assert llamadas == [] and "indexar --sentido" in aviso and "FTS" in aviso and res
+    assert sentido.llenar(con, corpus) > 1  # aparte, sin tope
+    res, aviso = sentido.buscar(con, corpus, "bronce", 5)
+    assert aviso is None and res

@@ -14,6 +14,8 @@ from pathlib import Path, PurePosixPath
 # Fijas en el código: un floppy.toml incompleto no debe exponer estas carpetas.
 EXCLUIR_SIEMPRE = ("gente/**", "life/**")
 FORMATOS = (".md", ".html", ".htm", ".pdf")  # Markdown va a doll-parser; los demás, a `extraer`
+# En un importado, el texto ya extraído de un documento (`a.pdf.json` es `a.pdf`): el PDF original no viaja.
+EXTRAIDOS = tuple(f"{f}.json" for f in FORMATOS if f != ".md")
 
 
 def home() -> Path:
@@ -82,11 +84,15 @@ class Corpus:
             return False  # .obsidian, .git y similares no son notas
         return not any(ruta.full_match(p) for p in EXCLUIR_SIEMPRE + self.excluir)
 
+    @property
+    def _formatos(self) -> tuple[str, ...]:
+        return FORMATOS + EXTRAIDOS if self.importado else FORMATOS
+
     def _recorrer(self):
         for carpeta, subcarpetas, nombres in self.ruta.walk():
             subcarpetas[:] = [s for s in subcarpetas if not s.startswith(".")]  # .git pesa más que las notas
             for nombre in nombres:
-                if nombre.lower().endswith(FORMATOS):  # antes de armar rutas: una fuente puede traer miles de archivos
+                if nombre.lower().endswith(self._formatos):  # antes de armar rutas: una fuente puede traer miles de archivos
                     yield carpeta / nombre
 
     def _archivos(self) -> dict[str, Path]:
@@ -95,10 +101,12 @@ class Corpus:
             # Con `**` se recorre todo, podando carpetas ocultas que glob sí recorrería. Sin `**`, glob solo abre
             # las carpetas del patrón: una fuente grande (todo iroFactory) no se recorre en cada `buscar`.
             for archivo in self._recorrer() if "**" in patron else self.ruta.glob(patron):
-                if not archivo.name.lower().endswith(FORMATOS):
+                if not archivo.name.lower().endswith(self._formatos):
                     continue
                 relativa = archivo.relative_to(self.ruta).as_posix()
                 if PurePosixPath(relativa).full_match(patron, case_sensitive=False) and archivo.is_file():
+                    if relativa.lower().endswith(EXTRAIDOS):
+                        relativa = relativa[:-len(".json")]
                     archivos[relativa] = archivo
         return archivos
 

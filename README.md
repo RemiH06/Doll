@@ -58,7 +58,7 @@ uv run doll buscar "escape de áncora"
 
 ## Launch arguments
 
-- `doll indexar [--sentido]`: sincroniza el índice con las notas; solo reprocesa las que cambiaron. Con `--sentido`, también embebe los fragmentos de terceros que no tienen vector (la primera vez tarda unos 0.4 s por fragmento en CPU).
+- `doll indexar [--sentido]`: sincroniza el índice con las notas; solo reprocesa las que cambiaron. Con `--sentido`, también embebe los fragmentos de terceros que no tienen vector (la primera vez tarda unos 0.4 s por fragmento en CPU). `buscar --sentido` embebe en línea hasta 200; si faltan más, responde con FTS y lo dice.
 - `doll buscar "consulta" [-k N] [--tipo T] [--dominio D] [--sentido]`: fragmentos con ruta y líneas. Con `--sentido`, busca por sentido y solo en notas de terceros.
 - `doll preguntar "consulta" [-k N] [--tipo T] [--dominio D]`: respuesta con citas verificadas.
 - `doll acomodar RUTA...`: propone dónde va cada nota; no escribe nada.

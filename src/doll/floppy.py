@@ -1,7 +1,8 @@
 """Exportar e importar floppies, con firma SSH.
 
 El zip lleva `floppy.toml` (manifiesto con el sha256 de cada archivo), su firma `floppy.toml.sig`, `notas/`,
-`vectores.db` y, con `--con-eval`, `eval/`. Nunca lleva la fuente, los patrones de exclusión ni `tapar`: dirían qué se
+`vectores.db` y, con `--con-eval`, `eval/`. Un PDF o HTML no viaja: viaja su texto ya extraído y tapado, como
+`notas/<ruta>.json` (ver `extraer.extraido`), y en el destino se sigue citando `<ruta>, p. N`. Uno sin texto no viaja. Nunca lleva la fuente, los patrones de exclusión ni `tapar`: dirían qué se
 quitó. Lo que `mcp_excluir` oculta tampoco sale, y un enlace a una nota que no sale se tapa en el texto.
 
 Un floppy importado es propio solo si su autor es el dueño de esta instalación (`~/.doll/doll.toml`) y la firma es de
@@ -22,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from doll import corpus as corpus_mod
-from doll import indice, sentido
+from doll import extraer, indice, sentido
 from doll.corpus import FORMATOS, Corpus
 from doll.parser import analizar
 
@@ -48,6 +49,8 @@ class Exportado:
     notas: int
     documentos: int
     vectores: int
+    sin_texto: int  # documentos sin capa de texto: no viajan
+    sin_vector: int  # fragmentos de terceros sin vector: quien importe los embebe con `indexar --sentido`
 
 
 @dataclass(frozen=True)
@@ -111,8 +114,6 @@ def exportar(corpus: Corpus, destino: Path, con_eval: bool = False) -> Exportado
     fuera = excluidas + [r for r in [*notas, *documentos] if not visible(r)]
     notas = {r: t for r, t in notas.items() if visible(r)}
     documentos = {r: a for r, a in documentos.items() if visible(r)}
-    if documentos and corpus.tapar:
-        raise SystemExit("`tapar` no se aplica dentro de un PDF o HTML: este floppy no se exporta")
     frases = indice._patron_tapar(corpus.tapar)
     if frases and (ruta := next((r for r in [*notas, *documentos] if frases.search(r)), None)):
         raise SystemExit(f"El nombre de {ruta} trae una frase de `tapar`: pásala a mcp_excluir")
@@ -134,11 +135,11 @@ def exportar(corpus: Corpus, destino: Path, con_eval: bool = False) -> Exportado
     rastros = sorted({r.removesuffix(".md") for r in fuera if "/" in r}, key=len, reverse=True)
     rutas_fuera = re.compile("|".join(re.escape(r) + r"(?:\.md)?" for r in rastros), re.IGNORECASE) if rastros else None
 
-    textos = {}
-    for ruta, texto in notas.items():
-        texto = WIKILINK.sub(enlace, texto)
+    def tapa(texto: str) -> str:
         texto = rutas_fuera.sub(indice.TEXTO_OCULTO, texto) if rutas_fuera else texto
-        textos[ruta] = frases.sub(indice.TEXTO_OCULTO, texto) if frases else texto
+        return frases.sub(indice.TEXTO_OCULTO, texto) if frases else texto
+
+    textos = {ruta: tapa(WIKILINK.sub(enlace, texto)) for ruta, texto in notas.items()}
     evals = {f"eval/{a.name}": a.read_text(encoding="utf-8") for a in sorted(corpus.eval.glob("*.toml"))} if con_eval else {}
     for ruta, texto in evals.items():
         if rutas_fuera and (m := rutas_fuera.search(texto)):  # tapada, la etiqueta dejaría el set roto
@@ -152,15 +153,22 @@ def exportar(corpus: Corpus, destino: Path, con_eval: bool = False) -> Exportado
         if corpus.es_terceros(ruta):
             queridos |= _hashes_vector(indice.Resultado(ruta, f.encabezado, f.linea_ini, f.linea_fin, f.texto)
                                        for f in nota.fragmentos)
-    filas = con.execute("SELECT ruta, encabezado, linea_ini, linea_fin, texto FROM fragmentos")
-    queridos |= _hashes_vector(r for r in map(indice.Resultado._make, filas)
-                               if r.ruta in documentos and corpus.es_terceros(r.ruta))
+    # Los documentos salen del índice: ya extraídos y con `tapar` (también el título). Se tapan otra vez por las rutas
+    # de lo que no sale, que el índice no conoce.
+    extraidos: dict[str, tuple[str, list[indice.Resultado]]] = {}
+    filas = con.execute("SELECT f.ruta, f.encabezado, f.linea_ini, f.linea_fin, f.texto, fts.titulo"
+                        " FROM fragmentos f JOIN fts ON fts.rowid = f.id ORDER BY f.id")
+    for ruta, encabezado, linea_ini, linea_fin, texto, titulo in filas:
+        if ruta in documentos:
+            r = indice.Resultado(ruta, tapa(encabezado), linea_ini, linea_fin, tapa(texto))
+            extraidos.setdefault(ruta, (tapa(titulo), []))[1].append(r)
+    queridos |= _hashes_vector(r for ruta, (_, rs) in extraidos.items() if corpus.es_terceros(ruta) for r in rs)
     con.execute(sentido.ESQUEMA)
     vectores = [(h, v) for h, v in con.execute("SELECT hash, v FROM vectores") if h in queridos]
     con.close()
 
     contenido = {f"notas/{r}": t.encode("utf-8") for r, t in textos.items()}
-    contenido |= {f"notas/{r}": a.read_bytes() for r, a in documentos.items()}
+    contenido |= {f"notas/{r}{extraer.EXTRAIDO}": extraer.a_json(titulo, rs) for r, (titulo, rs) in extraidos.items()}
     contenido |= {r: t.encode("utf-8") for r, t in evals.items()}
     if vectores:
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,7 +193,8 @@ def exportar(corpus: Corpus, destino: Path, con_eval: bool = False) -> Exportado
         z.writestr(FIRMA, firma.stdout)
         for ruta, datos in contenido.items():
             z.writestr(ruta, datos)
-    return Exportado(len(textos), len(documentos), len(vectores))
+    return Exportado(len(textos), len(extraidos), len(vectores), len(documentos) - len(extraidos),
+                     len(queridos) - len(vectores))
 
 
 def _permitida(nombre: str) -> bool:
@@ -196,7 +205,7 @@ def _permitida(nombre: str) -> bool:
     if not segura:
         return False
     if partes[0] == "notas":
-        return len(partes) > 1 and nombre.lower().endswith(FORMATOS)
+        return len(partes) > 1 and nombre.lower().endswith(FORMATOS + corpus_mod.EXTRAIDOS)
     if partes[0] == "eval":
         return len(partes) == 2 and nombre.endswith(".toml")
     return nombre in (MANIFIESTO, FIRMA, VECTORES)
@@ -315,7 +324,8 @@ def importar(archivo: Path, nombre: str | None = None) -> Importado:
                 f"propio = {'false' if terceros else 'true'}", f"terceros = {_toml(patrones)}",
                 'incluir = ["**/*"]', "mcp_excluir = []", ""]), encoding="utf-8")
             # El índice de palabras se rehace desde las notas: del ajeno solo se reusan vectores.
-            local = Corpus(nombre, tmp / "notas", terceros=tuple(patrones), mcp_excluir=(), incluir=("**/*",))
+            local = Corpus(nombre, tmp / "notas", terceros=tuple(patrones), mcp_excluir=(), incluir=("**/*",),
+                           importado=True)
             con = indice.abrir(tmp / "indice.db")
             indice.indexar(con, local)
             copiados = _copiar_vectores(con, local, tmp / VECTORES) if VECTORES in archivos else 0

@@ -149,6 +149,8 @@ def _sello(archivo: Path) -> str:
 
 def _extraer(ruta: str, archivo: Path) -> Nota:
     try:
+        if archivo.name.lower().endswith(extraer.EXTRAIDO):  # de un floppy importado: ya viene extraído
+            return extraer.extraido(archivo.read_text(encoding="utf-8"))
         if archivo.suffix.lower() == ".pdf":
             return extraer.pdf(archivo)
         return extraer.html(archivo.read_text(encoding="utf-8", errors="replace"))

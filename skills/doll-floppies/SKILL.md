@@ -17,10 +17,12 @@ Un floppy es una carpeta en `~/.doll/floppies/<nombre>/` con `floppy.toml`, su �
 
 1. Requisitos: `version` en el `floppy.toml` (sube en cada exportación; quien importa solo reemplaza por una mayor), `mcp_excluir` definido, y `dueno` y `llave` en `~/.doll/doll.toml`.
 2. `doll --floppy NOMBRE exportar -o NOMBRE-vN.zip`. Sin `--con-eval`, salvo que la persona lo pida: sus preguntas pueden nombrar notas privadas.
-3. Revisa el zip antes de entregarlo: `uv run python skills/doll-floppies/revisar_zip.py NOMBRE ZIP` desde el clon de Doll. Doll tapa enlaces y rutas con carpeta, pero no el nombre suelto de una nota excluida escrito en otra. Muestra a la persona cada coincidencia que no sea una palabra común y que decida: `tapar`, `mcp_excluir` o aceptarla.
+3. Revisa el zip antes de entregarlo: `uv run python skills/doll-floppies/revisar_zip.py NOMBRE ZIP` desde el clon de Doll. Debe decir "ninguna" en las frases de `tapar` que sobreviven y "ninguno" en archivos que no debían salir y en documentos originales. Doll tapa enlaces y rutas con carpeta, pero no el nombre suelto de una nota excluida escrito en otra. Muestra a la persona cada coincidencia que no sea una palabra común y que decida: `tapar`, `mcp_excluir` o aceptarla.
 4. Compartir el zip lo decide la persona. Nunca lo subas a un servicio externo por tu cuenta.
 
-Un floppy importado no se exporta, y uno con PDF o HTML y `tapar` tampoco (las frases no salen de un PDF).
+Un floppy importado no se exporta. Un PDF o HTML no viaja: viaja su texto ya extraído y con `tapar` aplicado (`notas/<ruta>.json`), y en el destino se cita igual (`a.pdf, p. N`). Los documentos sin texto no viajan. Si la ruta de un documento trae una frase de `tapar`, la exportación se detiene: pásalo a `mcp_excluir`.
+
+En un floppy con muchas notas de terceros, llena los vectores antes de exportar (`doll --floppy NOMBRE indexar --sentido`, tarda), para que `vectores.db` viaje completo: `buscar --sentido` no embebe más de unos cientos de fragmentos en línea y, si faltan más, responde con FTS y lo dice. La salida de `exportar` dice cuántos fragmentos van sin vector.
 
 ## Importar
 

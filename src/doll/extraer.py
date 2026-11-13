@@ -4,11 +4,14 @@ HTML: un fragmento por encabezado (`h1` a `h6`), con las líneas del archivo fue
 el número de página en `linea_ini` y `linea_fin`, y `p. N` como encabezado.
 """
 
+import json
 import logging
 from html.parser import HTMLParser
 from pathlib import Path
 
 from doll.parser import Fragmento, Nota
+
+EXTRAIDO = ".json"  # `a.pdf` viaja en un floppy como `a.pdf.json`
 
 MIN_PAGINA = 50  # caracteres: con menos, la página es un escaneo, una portada o una diapositiva de pura imagen
 TITULOS = {f"h{n}" for n in range(1, 7)}
@@ -99,3 +102,23 @@ def pdf(archivo: Path) -> Nota:
         if len(texto) >= MIN_PAGINA:
             fragmentos.append(Fragmento(f"p. {numero}", numero, numero, texto))
     return Nota(fragmentos, [], {}, False)
+
+
+def a_json(titulo: str, fragmentos) -> bytes:
+    """El texto ya extraído de un documento, como lo guarda el índice, para que viaje en un floppy sin el original."""
+    return json.dumps({"titulo": titulo, "fragmentos": [
+        {"encabezado": r.encabezado, "linea_ini": r.linea_ini, "linea_fin": r.linea_fin, "texto": r.texto}
+        for r in fragmentos]}, ensure_ascii=False, indent=1).encode("utf-8")
+
+
+def extraido(texto: str) -> Nota:
+    """Lo que escribe `a_json`. Viene de un zip ajeno: cualquier otra forma es un error, no se adivina."""
+    datos = json.loads(texto)
+    titulo, fragmentos = datos.get("titulo"), datos.get("fragmentos")
+    tipos = {"encabezado": str, "linea_ini": int, "linea_fin": int, "texto": str}
+    if not (isinstance(titulo, str | None) and isinstance(fragmentos, list)
+            and all(isinstance(f, dict) and f.keys() == tipos.keys()
+                    and all(type(f[k]) is t for k, t in tipos.items()) for f in fragmentos)):
+        raise ValueError("texto extraído con otra forma")
+    return Nota([Fragmento(f["encabezado"], f["linea_ini"], f["linea_fin"], f["texto"]) for f in fragmentos],
+                [], {}, False, titulo or None)

@@ -295,3 +295,70 @@ def test_ssh_keygen_que_no_responde_no_cuelga_y_se_puede_cambiar(origen, tmp_pat
     monkeypatch.setattr(floppy.subprocess, "run", colgado)
     with pytest.raises(SystemExit, match="ssh_keygen"):
         exportar(origen, tmp_path / "t2.zip")
+
+
+@pytest.fixture
+def apuntes(tmp_path, monkeypatch):
+    """Floppy de documentos, todo de terceros, con `tapar`: un PDF con texto, uno escaneado y un HTML."""
+    from test_documentos import HTML, PENDULO, VOLANTE, pdf_minimo
+
+    home = tmp_path / "origen"
+    monkeypatch.setenv("DOLL_HOME", str(home))
+    privada = llave(tmp_path / "ssh", "ana")
+    instalar(home, "ana", privada, privada)
+    fuente = tmp_path / "fuente"
+    (fuente / "oculto").mkdir(parents=True)
+    (fuente / "curso").mkdir()
+    (fuente / "curso" / "a.pdf").write_bytes(pdf_minimo([PENDULO, f"{VOLANTE} Entregado por Zacarias Nunez, ver oculto/b.pdf"]))
+    (fuente / "curso" / "escaneo.pdf").write_bytes(pdf_minimo(["", ""]))
+    (fuente / "curso" / "manual.html").write_text(HTML.replace("Manual del relojero", "Manual de Zacarías Núñez"), "utf-8")
+    (fuente / "oculto" / "b.pdf").write_bytes(pdf_minimo([PENDULO]))
+    carpeta = home / "floppies" / "apuntes"
+    carpeta.mkdir(parents=True)
+    (carpeta / "floppy.toml").write_text(
+        f"fuente = '{fuente.as_posix()}'\nversion = 1\nterceros = ['**']\nincluir = ['**/*.pdf', '**/*.html']\n"
+        "mcp_excluir = ['oculto/**']\ntapar = ['Zacarías Núñez']\n", encoding="utf-8")
+    return fuente
+
+
+def test_documentos_viajan_como_texto_tapado_y_se_citan_por_pagina(apuntes, tmp_path, monkeypatch):
+    e = floppy.exportar(corpus.cargar("apuntes"), tmp_path / "a.zip")
+    assert (e.documentos, e.sin_texto) == (2, 1)
+    z = leer_zip(tmp_path / "a.zip")
+    assert {n for n in z if n.startswith("notas/")} == {"notas/curso/a.pdf.json", "notas/curso/manual.html.json"}
+    todo = b"".join(z.values()).decode(errors="replace").casefold()
+    assert "zacar" not in todo and "nunez" not in todo and "núñez" not in todo and "oculto/b" not in todo
+    assert tomllib.loads(z["floppy.toml"].decode())["terceros"] == ["**"]
+
+    en_destino(tmp_path, monkeypatch, "beto", llave(tmp_path / "ssh", "beto"))
+    assert floppy.importar(tmp_path / "a.zip").terceros is not None
+    c = corpus.cargar("apuntes")
+    assert c.terceros == ("**",) and c.es_terceros("curso/a.pdf")
+    con = indice.abrir(c.indice)
+    [r] = indice.buscar(con, "raqueta volante", 1)
+    assert (r.ruta, r.encabezado, r.linea_ini) == ("curso/a.pdf", "p. 2", 2)
+    assert "curso/a.pdf, p. 2" in texto_fragmentos([r], c)
+    assert indice.buscar(con, "manual", 1)[0].ruta == "curso/manual.html"  # el título viaja, con lo tapado fuera
+    assert indice.buscar(con, "Zacarias", 5) == []
+
+
+def test_documento_con_frase_tapada_en_la_ruta_no_se_exporta(apuntes, tmp_path):
+    (apuntes / "curso" / "a.pdf").rename(apuntes / "curso" / "tarea zacarias nunez.pdf")
+    with pytest.raises(SystemExit, match="mcp_excluir"):
+        floppy.exportar(corpus.cargar("apuntes"), tmp_path / "a.zip")
+
+
+def test_texto_extraido_con_otra_forma_avisa_y_no_entra(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("DOLL_HOME", str(tmp_path / "home"))
+    raiz = tmp_path / "notas"
+    raiz.mkdir()
+    (raiz / "a.pdf.json").write_text('{"titulo": null, "fragmentos": [{"texto": 1}]}', encoding="utf-8")
+    (raiz / "b.pdf.json").write_text('{"titulo": "b", "fragmentos": [{"encabezado": "p. 1", "linea_ini": 1,'
+                                     ' "linea_fin": 1, "texto": "pendulo"}]}', encoding="utf-8")
+    con = indice.abrir(tmp_path / "t.db")
+    indice.indexar(con, corpus.Corpus("t", raiz, incluir=("**/*",), importado=True))
+    assert "no se pudo leer a.pdf" in capsys.readouterr().err
+    assert [r.ruta for r in indice.buscar(con, "pendulo", 5)] == ["b.pdf"]
+    # En un floppy con fuente, un .json es un archivo cualquiera: no entra.
+    con2 = indice.abrir(tmp_path / "t2.db")
+    assert indice.indexar(con2, corpus.Corpus("t", raiz, incluir=("**/*",))) == (0, 0)
